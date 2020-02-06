@@ -1,0 +1,9 @@
+target/
+resources/
+checkouts/
+*.log
+.lein*
+pom.xml
+.nrepl-port
+.DS_Store
+.*.swp
