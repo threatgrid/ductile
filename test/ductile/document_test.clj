@@ -11,54 +11,39 @@
 
 (deftest search-uri-test
   (testing "should generate a valid _search uri"
-    (is (= "http://localhost:9200/ctia_tool/tool/_search"
-           (es-doc/search-uri "http://localhost:9200"
-                              "ctia_tool"
-                              "tool")))
     (is (= "http://localhost:9200/ctia_tool/_search"
            (es-doc/search-uri "http://localhost:9200"
-                              "ctia_tool"
-                              nil)))
+                              "ctia_tool")))
     (is (= "http://localhost:9200/_search"
            (es-doc/search-uri "http://localhost:9200"
-                              nil
                               nil)))))
 
 (deftest delete-by-query-uri-test
   (testing "should generate a valid delete_by_query uri"
     (is (= "http://localhost:9200/ctim/_delete_by_query"
            (es-doc/delete-by-query-uri "http://localhost:9200"
-                                       ["ctim"]
-                                       nil)))
-    (is (= "http://localhost:9200/ctim/malware/_delete_by_query"
+                                       ["ctim"])))
+    (is (= "http://localhost:9200/ctim%2Cctia/_delete_by_query"
            (es-doc/delete-by-query-uri "http://localhost:9200"
-                                       ["ctim"]
-                                       "malware")))
-    (is (= "http://localhost:9200/ctim%2Cctia/malware/_delete_by_query"
-           (es-doc/delete-by-query-uri "http://localhost:9200"
-                                       ["ctim", "ctia"]
-                                       "malware")))))
+                                       ["ctim", "ctia"])))))
 
 (deftest index-doc-uri-test
   (testing "should generate a valid doc URI"
-    (is (= "http://127.0.0.1/test_index/test_mapping/test"
+    (is (= "http://127.0.0.1/test_index/_doc/test"
            (es-doc/index-doc-uri "http://127.0.0.1"
                                   "test_index"
-                                  "test_mapping"
                                   "test")))
-    (is (= "http://127.0.0.1/test_index/test_mapping/test%2Ffoo%2Fbar"
+    (is (= "http://127.0.0.1/test_index/_doc/test%2Ffoo%2Fbar"
            (es-doc/index-doc-uri "http://127.0.0.1"
                                   "test_index"
-                                  "test_mapping"
                                   "test/foo/bar")))))
 
 (deftest update-doc-uri-test
   (is (= (es-doc/update-doc-uri "http://127.0.0.1"
                                 "test_index"
-                                "test_mapping"
                                 "test"
                                 42)
-         "http://127.0.0.1/test_index/test_mapping/test/_update?retry_on_conflict=42"))  )
+         "http://127.0.0.1/test_index/_doc/test/_update?retry_on_conflict=42"))  )
 
 
 (deftest params->pagination-test
@@ -137,11 +122,9 @@
               sample-docs
               (repeatedly 10 #(hash-map :id (.toString (java.util.UUID/randomUUID))
                                         :_index "test_index"
-                                        :_type "test_mapping"
                                         :bar "foo"))
               get-sample-doc #(es-doc/get-doc conn
                                               "test_index"
-                                              "test_mapping"
                                               (:id sample-doc)
                                               {})]
           (testing "create-doc and get-doc"
@@ -149,7 +132,6 @@
             (is (= sample-doc
                    (es-doc/create-doc conn
                                       "test_index"
-                                      "test_mapping"
                                       sample-doc
                                       "true")))
             (is (= sample-doc (get-sample-doc)))
@@ -157,14 +139,12 @@
               (is (thrown? clojure.lang.ExceptionInfo
                            (es-doc/create-doc conn
                                               "test_index"
-                                              "test_mapping"
                                               sample-doc
                                               "true"))))
             (testing "with field selection"
               (is (= {:foo "bar is a lie"}
                      (es-doc/get-doc conn
                                      "test_index"
-                                     "test_mapping"
                                      (:id sample-doc)
                                      {:_source ["foo"]})))))
           (testing "update-doc"
@@ -175,7 +155,6 @@
               (is (= updated-doc1
                      (es-doc/update-doc conn
                                         "test_index"
-                                        "test_mapping"
                                         (:id sample-doc)
                                         update1
                                         "true")))
@@ -184,7 +163,6 @@
                 (is (= updated-doc2
                        (es-doc/update-doc conn
                                           "test_index"
-                                          "test_mapping"
                                           (:id sample-doc)
                                           update2
                                           "true"
@@ -196,7 +174,6 @@
                 (is (= indexed-doc
                        (es-doc/index-doc conn
                                          "test_index"
-                                         "test_mapping"
                                          indexed-doc
                                          "true")))
                 (is (= indexed-doc (get-sample-doc)))))
@@ -205,14 +182,12 @@
                 (is (= indexed-doc
                        (es-doc/index-doc conn
                                          "test_index"
-                                         "test_mapping"
                                          indexed-doc
                                          "true")))
                 (is (= indexed-doc (get-sample-doc)))
                 ;; restore with the initial values
                 (es-doc/index-doc conn
                                   "test_index"
-                                  "test_mapping"
                                   sample-doc
                                   "true"))))
           (testing "bulk-create-doc"
@@ -231,7 +206,6 @@
                 (is (= 10
                        (get-in (es-doc/search-docs conn
                                                    "test_index"
-                                                   "test_mapping"
                                                    {:query_string {:query "*"}}
                                                    {:test_value 43}
                                                    {:sort_by "test_value"
@@ -242,14 +216,12 @@
                            :sort [42]}}
                  (es-doc/search-docs conn
                                      "test_index"
-                                     "test_mapping"
                                      {:query_string {:query "bar"}}
                                      {:test_value 42}
                                      {:sort_by "test_value"
                                       :sort_order :desc})
                  (es-doc/search-docs conn
                                      "test_index"
-                                     nil
                                      {:query_string {:query "bar"}}
                                      {:test_value 42}
                                      {:sort_by "test_value"
@@ -258,7 +230,6 @@
           (is (true?
                (es-doc/delete-doc conn
                                   "test_index"
-                                  "test_mapping"
                                   (:id sample-doc)
                                   "true")))))
 
@@ -292,7 +263,6 @@
         conn (es-conn/connect {:host "localhost" :port 9200})
         search-query #(get-in (es-doc/search-docs conn
                                                   "test_index"
-                                                  "test_mapping"
                                                   nil
                                                   {}
                                                   {:limit 100})
@@ -302,7 +272,6 @@
     (doseq [doc docs]
       (es-doc/create-doc conn
                          "test_index"
-                         "test_mapping"
                          doc
                          "true"))
     (is (apply = (repeatedly 30 search-query)))
@@ -310,7 +279,6 @@
 
 (deftest ^:integration count-test
   (let [sample-docs (mapv #(assoc {:_index "test_index"
-                                   :_type "test_mapping"
                                    :foo :bar}
                                   :_id %)
                           (range 10))
@@ -319,11 +287,11 @@
     (es-index/create! conn "test_index" {})
     (es-doc/bulk-create-doc conn sample-docs "true")
     (is (= 10
-           (es-doc/count-docs conn "test_index" "test_mapping")
-           (es-doc/count-docs conn "test_index" nil)
-           (es-doc/count-docs conn "test_index" "test_mapping" {:term {:foo :bar}})
-           (es-doc/count-docs conn "test_index" "test_mapping" {:match_all {}})))
-    (is (= 3 (es-doc/count-docs conn "test_index" "test_mapping" {:ids {:values (range 3)}})))
+           (es-doc/count-docs conn "test_index")
+           (es-doc/count-docs conn "test_index")
+           (es-doc/count-docs conn "test_index" {:term {:foo :bar}})
+           (es-doc/count-docs conn "test_index" {:match_all {}})))
+    (is (= 3 (es-doc/count-docs conn "test_index" {:ids {:values (range 3)}})))
     (es-index/delete! conn "test_index")))
 
 (defn is-full-hits?
@@ -332,7 +300,6 @@
 
 (deftest ^:integration query-test
   (let [sample-docs (mapv #(assoc {:_index "test_index"
-                                   :_type "test_mapping"
                                    :foo :bar
                                    :price %}
                                   :_id (str %))
@@ -346,17 +313,14 @@
         _ (es-doc/bulk-create-doc conn sample-docs "true")
         ids-query-result-1 (es-doc/query conn
                                          "test_index"
-                                         "test_mapping"
                                          (query/ids sample-3-ids)
                                          {})
         ids-query-result-2 (es-doc/query conn
                                          "test_index"
-                                         "test_mapping"
                                          (query/ids sample-3-ids)
                                          {:full-hits? true})
         search_after-result (es-doc/query conn
                                           "test_index"
-                                          "test_mapping"
                                           {:match_all {}}
                                           {:limit 2
                                            :sort ["price"]
@@ -366,7 +330,6 @@
          aggs-1 :aggs
          paging-aggs-1 :paging} (es-doc/query conn
                                               "test_index"
-                                              "test_mapping"
                                               {:match_all {}}
                                               avg-aggs
                                               {:limit 5})
@@ -375,7 +338,6 @@
         {data-aggs-2 :data
          aggs-2 :aggs} (es-doc/query conn
                                      "test_index"
-                                     "test_mapping"
                                      {:match_all {}}
                                      stats-aggs
                                      {:limit 0})
@@ -383,7 +345,6 @@
         {data-aggs-3 :data
          aggs-3 :aggs} (es-doc/query conn
                                      "test_index"
-                                     "test_mapping"
                                      (query/ids (map :_id (take 3 sample-docs)))
                                      stats-aggs
                                      {:limit 10})]
@@ -439,14 +400,12 @@
 
 (deftest ^:integration delete-by-query-test
   (let [sample-docs-1 (mapv #(assoc {:_index "test_index-1"
-                                     :_type "test_mapping"
                                      :foo (if (< % 5)
                                             :bar1
                                             :bar2)}
                                     :_id %)
                             (range 10))
         sample-docs-2 (mapv #(assoc {:_index "test_index-2"
-                                     :_type "test_mapping"
                                      :foo (if (< % 5)
                                             :bar1
                                             :bar2)}
@@ -463,30 +422,19 @@
     (is (= 5
            (:deleted (es-doc/delete-by-query conn
                                              ["test_index-1"]
-                                             "test_mapping"
                                              q-term
                                              true
                                              "true")))
-        "delete-by-query should delete all documents that match a query for given index and mapping")
-    (is (= 5
-           (:deleted (es-doc/delete-by-query conn
-                                             ["test_index-2"]
-                                             nil
-                                             q-term
-                                             true
-                                             "true")))
-        "delete-by-query should delete all documents that match a query for given index without specifying mapping")
+        "delete-by-query should delete all documents that match a query for given index")
     (is (= 6
            (:deleted (es-doc/delete-by-query conn
                                              ["test_index-1", "test_index-2"]
-                                             "test_mapping"
                                              q-ids-1
                                              true
                                              "true")))
         "delete-by-query should properly apply deletion on all given indices")
     (is (seq (:task (es-doc/delete-by-query conn
                                             ["test_index-1", "test_index-2"]
-                                            "test_mapping"
                                             q-ids-2
                                             false
                                             "true")))

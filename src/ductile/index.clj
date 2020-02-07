@@ -108,7 +108,7 @@
    index-name :- s/Str
    index-config]
   (let [template (str index-name "*")
-        opts (assoc index-config :template template)]
+        opts (assoc index-config :index_patterns template)]
     (safe-es-read
      (client/put (template-uri uri index-name)
                  (merge default-opts

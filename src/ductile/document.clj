@@ -19,8 +19,11 @@
 
 (defn index-doc-uri
   "make an uri for document index"
-  [uri index-name mapping id]
-  (str (uri/uri uri (uri/uri-encode index-name) (uri/uri-encode mapping) (uri/uri-encode id))))
+  [uri index-name id]
+  (str (uri/uri uri
+                (uri/uri-encode index-name)
+                "_doc"
+                (uri/uri-encode id))))
 
 (def delete-doc-uri
   "make an uri for doc deletion"
@@ -34,14 +37,13 @@
   "make an uri for document update"
   [uri
    index-name
-   mapping
    id
    retry-on-conflict]
   (str
    (assoc
      (uri/uri uri
               (uri/uri-encode index-name)
-              (uri/uri-encode mapping)
+              "_doc"
               (uri/uri-encode id) "_update")
     :query {:retry_on_conflict
             retry-on-conflict})))
@@ -53,22 +55,20 @@
 
 (defn search-uri
   "make an uri for search action"
-  [uri index-name mapping]
+  [uri index-name]
   (cond-> uri
     index-name (str "/" (uri/uri-encode index-name))
-    mapping (str "/" (uri/uri-encode mapping))
-    true (str "/_search")))
+    :else (str "/_search")))
 
 (defn count-uri
   "make an uri for search action"
-  [uri index-name mapping]
-  (str (uri/uri uri (uri/uri-encode index-name) (uri/uri-encode mapping) "_count")))
+  [uri index-name]
+  (str (uri/uri uri (uri/uri-encode index-name) "_count")))
 
 (def ^:private special-operation-keys
   "all operations fields for a bulk operation"
   [:_doc_as_upsert
    :_index
-   :_type
    :_id
    :_retry_on_conflict
    :_routing
@@ -96,10 +96,9 @@
 
 (s/defn get-doc
   "get a document on es and return only the source"
-  [{:keys [uri cm]} :- ESConn index-name mapping id params]
+  [{:keys [uri cm]} :- ESConn index-name id params]
   (-> (client/get (get-doc-uri uri
                                index-name
-                               mapping
                                id)
                   (assoc (make-default-opts params)
                          :connection-manager cm))
@@ -109,14 +108,13 @@
 (s/defn index-doc-internal
   [{:keys [uri cm]} :- ESConn
    index-name :- s/Str
-   mapping :- s/Str
    {:keys [id] :as doc} :- s/Any
    {:keys [refresh op_type]}]
   (let [query-params (cond-> {}
                        refresh (assoc :refresh refresh)
                        op_type (assoc :op_type op_type))]
     (safe-es-read
-     (client/put (index-doc-uri uri index-name mapping id)
+     (client/put (index-doc-uri uri index-name id)
                  (merge default-opts
                         {:form-params doc
                          :query-params query-params
@@ -127,20 +125,21 @@
   "index a document on es return the indexed document"
   [es-conn :- ESConn
    index-name :- s/Str
-   mapping :- s/Str
    doc :- s/Any
    refresh? :- Refresh]
-  (index-doc-internal es-conn index-name mapping doc {:refresh refresh?}))
+  (index-doc-internal es-conn index-name doc {:refresh refresh?}))
 
 (s/defn create-doc
   "create a document on es return the created document"
   [es-conn :- ESConn
    index-name :- s/Str
-   mapping :- s/Str
    doc :- s/Any
    refresh? :- Refresh]
-  (index-doc-internal es-conn index-name mapping doc {:refresh refresh?
-                                                      :op_type "create"}))
+  (index-doc-internal es-conn
+                      index-name
+                      doc
+                      {:refresh refresh?
+                       :op_type "create"}))
 
 (defn byte-size
   "Count the size of the given string in bytes."
@@ -211,7 +210,6 @@
   "update a document on es return the updated document"
   [{:keys [uri cm]} :- ESConn
    index-name :- s/Str
-   mapping :- s/Str
    id :- s/Str
    doc :- s/Any
    refresh? :- Refresh
@@ -219,7 +217,7 @@
        :or {retry-on-conflict
             default-retry-on-conflict}}]]
   (-> (client/post
-       (update-doc-uri uri index-name mapping id retry-on-conflict)
+       (update-doc-uri uri index-name id retry-on-conflict)
        (merge default-opts
               {:form-params {:doc doc}
                :query-params {:refresh refresh?
@@ -232,10 +230,9 @@
   "delete a document on es, returns boolean"
   [{:keys [uri cm]} :- ESConn
    index-name :- s/Str
-   mapping :- s/Str
    id :- s/Str
    refresh? :- Refresh]
-  (-> (client/delete (delete-doc-uri uri index-name mapping id)
+  (-> (client/delete (delete-doc-uri uri index-name id)
                      (merge default-opts
                             {:query-params {:refresh refresh?}
                              :connection-manager cm}))
@@ -244,24 +241,22 @@
       (= "deleted")))
 
 (s/defn delete-by-query-uri
-  [uri index-names mapping]
+  [uri index-names]
   (let [index (string/join "," index-names)]
     (str (uri/uri uri
                   (uri/uri-encode index)
-                  (uri/uri-encode mapping)
                   "_delete_by_query"))))
 
 (s/defn delete-by-query
   "delete all documents that match a query in an index"
   [{:keys [uri cm]} :- ESConn
    index-names :- [s/Str]
-   mapping :- (s/maybe s/Str)
    q :- ESQuery
    wait-for-completion? :- s/Bool
    refresh? :- Refresh]
   (safe-es-read
    (client/post
-    (delete-by-query-uri uri index-names mapping)
+    (delete-by-query-uri uri index-names)
     (merge default-opts
            {:query-params {:refresh refresh?
                            :wait_for_completion wait-for-completion?}
@@ -307,10 +302,9 @@
   "Count documents on ES matching given query."
   ([{:keys [uri cm]} :- ESConn
    index-name :- s/Str
-   mapping :- (s/maybe s/Str)
    query :- (s/maybe ESQuery)]
    (-> (client/post
-        (count-uri uri index-name mapping)
+        (count-uri uri index-name)
         (merge default-opts
                (when query
                  {:form-params {:query query}})
@@ -318,9 +312,8 @@
        safe-es-read
        :count))
   ([es-conn :- ESConn
-    index-name :- s/Str
-    mapping :- (s/maybe s/Str)]
-   (count-docs es-conn index-name mapping nil)))
+    index-name :- s/Str]
+   (count-docs es-conn index-name nil)))
 
 (defn- result-data
   [res full-hits?]
@@ -334,7 +327,7 @@
    :limit size
    :sort (-> hits :hits last :sort)
    :search_after search_after
-   :hits (:total hits 0)})
+   :hits (get-in hits [:total :value] 0)})
 
 (defn- format-result
   [{:keys [aggregations] :as res}
@@ -348,7 +341,6 @@
   "Search for documents on ES using any query. Performs aggregations when specified."
   ([{:keys [uri cm]} :- ESConn
     index-name :- (s/maybe s/Str)
-    mapping :- (s/maybe s/Str)
     q :- (s/maybe ESQuery)
     aggs :- (s/maybe ESAggs)
     {:keys [full-hits? scroll]
@@ -356,25 +348,23 @@
    (let [es-params (generate-es-params q aggs params)
          res (safe-es-read
               (client/post
-               (search-uri uri index-name mapping)
-               (merge default-opts
-                      {:form-params es-params
-                       :connection-manager cm}
-                      (when scroll
-                        {:query-params {:scroll scroll}}))))]
-     (log/debug "search-docs:" es-params)
+               (search-uri uri index-name)
+               (into default-opts
+                     {:form-params es-params
+                      :connection-manager cm
+                      :query-params {:track_total_hits true}})))]
+     (log/debug "query:" es-params)
      (format-result res es-params full-hits?)))
-  ([es-conn index-name mapping q params]
-   (query es-conn index-name mapping q nil params)))
+  ([es-conn index-name q params]
+   (query es-conn index-name q nil params)))
 
 (s/defn search-docs
   "Search for documents on ES using a query string search.  Also applies a filter map, converting
    the values in the all-of into must match terms."
   [es-conn :- ESConn
    index-name :- (s/maybe s/Str)
-   mapping :- (s/maybe s/Str)
    es-query :- (s/maybe ESQuery)
    all-of :- (s/maybe {s/Any s/Any})
    params :- s/Any]
   (let [bool-query (q/filter-map->terms-query all-of es-query)]
-    (query es-conn index-name mapping bool-query params)))
+    (query es-conn index-name bool-query params)))

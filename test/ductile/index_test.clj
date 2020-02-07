@@ -71,8 +71,11 @@
                             :creation_date
                             :uuid
                             :version)))
-          (is (= {:acknowledged true} index-open-res))
-          (is (= {:acknowledged true} index-close-res))
+          (is (= {:acknowledged true :shards_acknowledged true} index-open-res))
+          (is (= {:acknowledged true
+                  :shards_acknowledged true
+                  :indices {:test_index {:closed true}}}
+                 index-close-res))
           (is (true? (boolean index-delete-res))))))))
 
 (deftest ^:integration rollover-test
@@ -103,7 +106,6 @@
     ;; add 3 documents to trigger max-doc condition
     (es-doc/bulk-create-doc conn
                             (repeat 3 {:_index "test_alias"
-                                       :_type "whatever"
                                        :foo :bar})
                             "true")
 
@@ -158,13 +160,13 @@
         indexname "template-test"
         config {:settings {:number_of_shards "1"
                            :refresh_interval "2s"}
-                :mappings {:type1 {:_source {:enabled false}}}
+                :mappings {:_source {:enabled false}}
                 :aliases {:alias1 {}
                           :alias2 {:filter {:term {:user "kimchy"}}
                                    :routing "kimchy"}}}
         create-res (es-index/create-template! conn indexname config)
         get-res-1 (es-index/get-template conn indexname)
-        {:keys [template mappings settings aliases]} ((keyword indexname) get-res-1)
+        {:keys [index_patterns mappings settings aliases]} ((keyword indexname) get-res-1)
         delete-res (es-index/delete-template! conn indexname)
         get-res-2 (es-index/get-template conn indexname)
         ack-res {:acknowledged true}]
@@ -183,4 +185,4 @@
             :search_routing "kimchy"}
            (:alias2 aliases)))
     (is (= 2 (count aliases)))
-    (is (= template (str indexname "*")))))
+    (is (= index_patterns [(str indexname "*")]))))
