@@ -43,7 +43,7 @@
                                 "test_index"
                                 "test"
                                 42)
-         "http://127.0.0.1/test_index/_doc/test/_update?retry_on_conflict=42"))  )
+         "http://127.0.0.1/test_index/test/_update?retry_on_conflict=42"))  )
 
 
 (deftest params->pagination-test

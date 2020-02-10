@@ -43,7 +43,6 @@
    (assoc
      (uri/uri uri
               (uri/uri-encode index-name)
-              "_doc"
               (uri/uri-encode id) "_update")
     :query {:retry_on_conflict
             retry-on-conflict})))
@@ -111,23 +110,25 @@
    {:keys [id] :as doc} :- s/Any
    {:keys [refresh op_type]}]
   (let [query-params (cond-> {}
-                       refresh (assoc :refresh refresh)
-                       op_type (assoc :op_type op_type))]
-    (safe-es-read
-     (client/put (index-doc-uri uri index-name id)
-                 (merge default-opts
-                        {:form-params doc
-                         :query-params query-params
-                         :connection-manager cm})))
-    doc))
+                       refresh (assoc :refresh (name refresh))
+                       op_type (assoc :op_type op_type))
+        {:keys [_id]} (safe-es-read
+               (client/post (index-doc-uri uri index-name id)
+                            (merge default-opts
+                                   {:form-params doc
+                                    :query-params query-params
+                                    :connection-manager cm})))]
+    (assoc doc :id _id)))
 
 (s/defn index-doc
   "index a document on es return the indexed document"
-  [es-conn :- ESConn
-   index-name :- s/Str
-   doc :- s/Any
-   refresh? :- Refresh]
-  (index-doc-internal es-conn index-name doc {:refresh refresh?}))
+  ([es-conn :- ESConn
+    index-name :- s/Str
+    doc :- s/Any
+    refresh? :- Refresh]
+   (index-doc-internal es-conn index-name doc {:refresh refresh?}))
+  ([es-conn index-name doc] (index-doc-internal))
+  )
 
 (s/defn create-doc
   "create a document on es return the created document"
@@ -220,7 +221,7 @@
        (update-doc-uri uri index-name id retry-on-conflict)
        (merge default-opts
               {:form-params {:doc doc}
-               :query-params {:refresh refresh?
+               :query-params {:refresh (name refresh?)
                               :_source true}
                :connection-manager cm}))
       safe-es-read
@@ -234,7 +235,7 @@
    refresh? :- Refresh]
   (-> (client/delete (delete-doc-uri uri index-name id)
                      (merge default-opts
-                            {:query-params {:refresh refresh?}
+                            {:query-params {:refresh (name refresh?)}
                              :connection-manager cm}))
       safe-es-read
       :result
@@ -258,7 +259,7 @@
    (client/post
     (delete-by-query-uri uri index-names)
     (merge default-opts
-           {:query-params {:refresh refresh?
+           {:query-params {:refresh (name refresh?)
                            :wait_for_completion wait-for-completion?}
             :form-params {:query q}
             :connection-manager cm}))))
