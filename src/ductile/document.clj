@@ -294,7 +294,7 @@
 (defn generate-es-params
   [query aggs params]
   (cond-> (into (params->pagination params)
-                (select-keys params [:sort :_source]))
+                (select-keys params [:sort :_source :track_total_hits]))
     query (assoc :query query)
     aggs (assoc :aggs aggs)))
 
@@ -321,7 +321,7 @@
     (not full-hits?) (map :_source)))
 
 (defn- pagination-params
-  [{:keys [_scroll_id hits]}
+  [{:keys [hits]}
    {:keys [from size search_after]}]
   {:offset from
    :limit size
@@ -343,7 +343,7 @@
     index-name :- (s/maybe s/Str)
     q :- (s/maybe ESQuery)
     aggs :- (s/maybe ESAggs)
-    {:keys [full-hits? scroll]
+    {:keys [full-hits?]
      :as params} :- s/Any]
    (let [es-params (generate-es-params q aggs params)
          res (safe-es-read
@@ -351,8 +351,7 @@
                (search-uri uri index-name)
                (into default-opts
                      {:form-params es-params
-                      :connection-manager cm
-                      :query-params {:track_total_hits true}})))]
+                      :connection-manager cm})))]
      (log/debug "query:" es-params)
      (format-result res es-params full-hits?)))
   ([es-conn index-name q params]

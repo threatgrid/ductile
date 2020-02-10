@@ -364,10 +364,35 @@
                   (map #(-> % :_source :foo)))))
       (is (= (repeat 3 "test_index")
              (->> (:data ids-query-result-2)
-                  (map :_index)))))
-    (is (not-any? is-full-hits? ids-query-result-2),
-        "by default, full-hits? is set to true")
-
+                  (map :_index))))
+      (is (not-any? is-full-hits? (:data ids-query-result-1))
+          "by default, full-hits? is set to false"))
+    (testing "track_total_hits should be properly considered"
+      (is (= 2 (-> (es-doc/query conn
+                                 "test_index"
+                                 (query/ids sample-3-ids)
+                                 {:track_total_hits 2})
+                   :paging
+                   :total-hits)))
+      (is (= 3
+             (-> (es-doc/query conn
+                               "test_index"
+                               (query/ids sample-3-ids)
+                               {:track_total_hits true})
+                 :paging
+                 :total-hits)
+             (-> (es-doc/query conn
+                               "test_index"
+                               (query/ids sample-3-ids)
+                               {})
+                 :paging
+                 :total-hits)))
+      (is (= 0 (-> (es-doc/query conn
+                                 "test_index"
+                                 (query/ids sample-3-ids)
+                                 {:track_total_hits false})
+                   :paging
+                   :total-hits))))
     (testing "sort and search_after params should be properly applied"
       (is (= '(6 7)
              (map :price (:data search_after-result))))
