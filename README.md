@@ -75,14 +75,14 @@ It's currently compatible with Elasticsearch 7.X
   ```
   it will return the document creation result
   ``` javascript
-{:_index "test-index",
- :_type "_doc",
- :_id "1",
- :_version 1,
- :result "created",
- :_shards {:total 2, :successful 1, :failed 0},
- :_seq_no 0,
- :_primary_term 1}
+   {:_index "test-index",
+    :_type "_doc",
+    :_id "1",
+    :_version 1,
+    :result "created",
+    :_shards {:total 2, :successful 1, :failed 0},
+    :_seq_no 0,
+    :_primary_term 1}
   ```
   
   ;; if you do not provide the id field, elasticsearch will insert the document and generate an id
@@ -94,16 +94,15 @@ It's currently compatible with Elasticsearch 7.X
                      :wait_for)
   ```
   ``` javascript
-{:_index "test-index",
- :_type "_doc",
- :_id "EBD9L3ABLWPPOW84CV6I",
- :_version 1,
- :result "created",
- :_shards {:total 2, :successful 1, :failed 0},
- :_seq_no 0,
- :_primary_term 1}
+   {:_index "test-index",
+    :_type "_doc",
+    :_id "EBD9L3ABLWPPOW84CV6I",
+    :_version 1,
+    :result "created",
+    :_shards {:total 2, :successful 1, :failed 0},
+    :_seq_no 0,
+    :_primary_term 1}
   ```
-  
   you can similarly create a document with index-doc, but if the document already exists it will erase it
   ``` clojure
   (es-doc/index-doc c
@@ -156,58 +155,58 @@ It's currently compatible with Elasticsearch 7.X
 
 * and of course you can query it!
 you can either provide classical elasticsearch queries or use some helpers from `ductile.query` namespace
-```clojure
-(require `[ductile.query :as es-query])
-(es-doc/query c
-              "test-index"
-              (es-query/ids [1 2])
-              {})
-```
-``` javascript
-{:data
- ({:id 2, :name "Jane Doe", :description "another anonymous coward"}),
- :paging {:total-hits 1}}
-```
-if you need all metadata you can use the full-hits? option
-``` clojure
-(clojure.pprint/pprint
+  ```clojure
+  (require `[ductile.query :as es-query])
   (es-doc/query c
                 "test-index"
-                {:match_all {}}
-                {:full-hits? true
-                 :sort {"id" {:order :desc}}
-                 :limit 2}))
-```
-it will return not only the matched documents but also meta data like `_index` and `_score`
-``` javascript
-{:data
- [{:_index "test-index",
-   :_type "_doc",
-   :_id "2",
-   :_score nil,
-   :_source
-   {:id 2, :name "Jane Doe", :description "another anonymous coward"},
-   :sort [2]}
-  {:_index "test-index",
-   :_type "_doc",
-   :_id "1",
-   :_score nil,
-   :_source
-   {:id 1, :name "Jane Doe", :description "another anonymous coward"},
-   :sort [1]}],
- :paging
- {:total-hits 3,
-  :next {:limit 2, :offset 2, :search_after [1]},
-  :sort [1]}}
-```
-Ductile also provides a search function with a simple interface that offers to use a Mongo like filters lucene query string to easily match documents
-``` clojure
-(es-doc/search-docs c
-                    "test-index"
-                    {:query_string {:query "anonymous"}}
-                    {:age 36}
-                    {:sort {:name {:order :desc}}})
-```
+                (es-query/ids [1 2])
+                {})
+  ```
+  ``` javascript
+  {:data
+   ({:id 2, :name "Jane Doe", :description "another anonymous coward"}),
+   :paging {:total-hits 1}}
+  ```
+  if you need all metadata you can use the full-hits? option
+  ``` clojure
+  (clojure.pprint/pprint
+    (es-doc/query c
+                  "test-index"
+                  {:match_all {}}
+                  {:full-hits? true
+                   :sort {"id" {:order :desc}}
+                   :limit 2}))
+  ```
+  it will return not only the matched documents but also meta data like `_index` and `_score`
+  ``` javascript
+  {:data
+   [{:_index "test-index",
+     :_type "_doc",
+     :_id "2",
+     :_score nil,
+     :_source
+     {:id 2, :name "Jane Doe", :description "another anonymous coward"},
+     :sort [2]}
+    {:_index "test-index",
+     :_type "_doc",
+     :_id "1",
+     :_score nil,
+     :_source
+     {:id 1, :name "Jane Doe", :description "another anonymous coward"},
+     :sort [1]}],
+   :paging
+   {:total-hits 3,
+    :next {:limit 2, :offset 2, :search_after [1]},
+    :sort [1]}}
+  ```
+  Ductile also provides a search function with a simple interface that offers to use a Mongo like filters lucene query string to easily match documents
+  ``` clojure
+  (es-doc/search-docs c
+                      "test-index"
+                      {:query_string {:query "anonymous"}}
+                      {:age 36}
+                      {:sort {:name {:order :desc}}})
+  ```
 
 
 ## License
