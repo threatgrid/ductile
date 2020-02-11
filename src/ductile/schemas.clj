@@ -24,6 +24,16 @@
    https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-refresh.html"
   (s/enum "true" "false" "wait_for"))
 
+(s/defschema CRUDOptions
+  (st/open-schema
+   (st/optional-keys
+    {:refresh Refresh
+     :retry_on_conflict s/Int
+     :wait_for_completion s/Bool
+     :_source (s/cond-pre s/Bool [s/Str])
+     :mk-id (s/=> s/Any s/Any)
+     :op_type (s/enum "create" "index")})))
+
 (s/defschema ESSlicing
   {:strategy s/Keyword
    :granularity s/Keyword})

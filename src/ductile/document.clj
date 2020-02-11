@@ -9,7 +9,7 @@
                            safe-es-read
                            safe-es-bulk-read
                            make-default-opts]]
-             [schemas :refer [ESAggs ESConn ESQuery Refresh]]
+             [schemas :refer [ESAggs ESConn ESQuery CRUDOptions]]
              [pagination :as pagination]
              [query :as q]]
             [schema.core :as s]))
@@ -37,16 +37,12 @@
   "make an uri for document update"
   [uri
    index-name
-   id
-   retry-on-conflict]
+   id]
   (str
-   (assoc
-     (uri/uri uri
-              (uri/uri-encode index-name)
-              "_update"
-              (uri/uri-encode id))
-    :query {:retry_on_conflict
-            retry-on-conflict})))
+   (uri/uri uri
+            (uri/uri-encode index-name)
+            "_update"
+            (uri/uri-encode id))))
 
 (defn bulk-uri
   "make an uri for bulk action"
@@ -63,7 +59,10 @@
 (defn count-uri
   "make an uri for search action"
   [uri index-name]
-  (str (uri/uri uri (uri/uri-encode index-name) "_count")))
+  (str
+   (uri/uri uri
+            (uri/uri-encode index-name)
+            "_count")))
 
 (def ^:private special-operation-keys
   "all operations fields for a bulk operation"
@@ -96,11 +95,14 @@
 
 (s/defn get-doc
   "get a document on es and return only the source"
-  [{:keys [uri cm]} :- ESConn index-name id params]
+  [{:keys [uri cm]} :- ESConn
+   index-name :- s/Str
+   id
+   opts :- CRUDOptions]
   (-> (client/get (get-doc-uri uri
                                index-name
                                id)
-                  (assoc (make-default-opts params)
+                  (assoc (make-default-opts opts)
                          :connection-manager cm))
       safe-es-read
       :_source))
@@ -108,13 +110,13 @@
 (s/defn index-doc-internal
   [{:keys [uri cm]} :- ESConn
    index-name :- s/Str
-   {:keys [id] :as doc} :- s/Any
-   {:keys [refresh op_type]}]
-  (let [query-params (cond-> {}
-                       refresh (assoc :refresh (name refresh))
-                       op_type (assoc :op_type op_type))]
+   doc :- s/Any
+   {:keys [mk-id]
+    :or {mk-id :id}
+    :as opts} :- CRUDOptions]
+  (let [query-params (select-keys opts [:refresh :op_type])]
     (safe-es-read
-     (client/post (index-doc-uri uri index-name id)
+     (client/post (index-doc-uri uri index-name (mk-id doc))
                   (merge default-opts
                          {:form-params doc
                           :query-params query-params
@@ -125,8 +127,8 @@
   ([es-conn :- ESConn
     index-name :- s/Str
     doc :- s/Any
-    refresh? :- Refresh]
-   (index-doc-internal es-conn index-name doc {:refresh refresh?}))
+    opts :- CRUDOptions]
+   (index-doc-internal es-conn index-name doc opts))
   ([es-conn index-name doc] (index-doc-internal)))
 
 (s/defn create-doc
@@ -134,12 +136,11 @@
   [es-conn :- ESConn
    index-name :- s/Str
    doc :- s/Any
-   refresh? :- Refresh]
+   opts :- CRUDOptions]
   (index-doc-internal es-conn
                       index-name
                       doc
-                      {:refresh refresh?
-                       :op_type "create"}))
+                      (assoc opts :op_type "create")))
 
 (defn byte-size
   "Count the size of the given string in bytes."
@@ -170,15 +171,15 @@
 
 (defn- bulk-post-docs
   [json-ops
-   {:keys [uri cm]}
-   refresh?]
+   {:keys [uri cm] :as _conn}
+   opts]
   (let [bulk-body (-> json-ops
                       (interleave (repeat "\n"))
                       string/join)]
     (-> (client/post (bulk-uri uri)
                      (merge default-opts
                             {:connection-manager cm
-                             :query-params {:refresh refresh?}
+                             :query-params (select-keys opts [:refresh])
                              :body bulk-body}))
         safe-es-read
         safe-es-bulk-read)))
@@ -187,11 +188,11 @@
   "create multiple documents on ES and return the created documents"
   ([conn :- ESConn
     docs :- [s/Any]
-    refresh? :- Refresh]
-   (bulk-create-doc conn docs refresh? nil))
+    opts :- CRUDOptions]
+   (bulk-create-doc conn docs opts nil))
   ([conn :- ESConn
     docs :- [s/Any]
-    refresh? :- Refresh
+    opts :- CRUDOptions
     max-size :- (s/maybe s/Int)]
    (let [ops (bulk-index docs)
          json-ops (map (fn [xs]
@@ -203,7 +204,7 @@
                            (partition-json-ops json-ops max-size)
                            [json-ops])]
      (doseq [json-ops-group json-ops-groups]
-       (bulk-post-docs json-ops-group conn refresh?))
+       (bulk-post-docs json-ops-group conn opts))
      docs)))
 
 (s/defn update-doc
@@ -212,16 +213,16 @@
    index-name :- s/Str
    id :- s/Str
    doc :- s/Any
-   refresh? :- Refresh
-   & [{:keys [retry-on-conflict]
-       :or {retry-on-conflict
-            default-retry-on-conflict}}]]
+   opts :- CRUDOptions]
   (-> (client/post
-       (update-doc-uri uri index-name id retry-on-conflict)
+       (update-doc-uri uri index-name id)
        (merge default-opts
               {:form-params {:doc doc}
-               :query-params {:refresh (name refresh?)
-                              :_source true}
+               :query-params (into {:_source true
+                                    :retry_on_conflict default-retry-on-conflict}
+                                   (select-keys opts [:refresh
+                                                      :retry_on_conflict
+                                                      :_source]))
                :connection-manager cm}))
       safe-es-read
       (get-in [:get :_source])))
@@ -231,10 +232,10 @@
   [{:keys [uri cm]} :- ESConn
    index-name :- s/Str
    id :- s/Str
-   refresh? :- Refresh]
+   opts :- CRUDOptions]
   (-> (client/delete (delete-doc-uri uri index-name id)
                      (merge default-opts
-                            {:query-params {:refresh (name refresh?)}
+                            {:query-params (select-keys opts [:refresh])
                              :connection-manager cm}))
       safe-es-read
       :result
@@ -252,14 +253,12 @@
   [{:keys [uri cm]} :- ESConn
    index-names :- [s/Str]
    q :- ESQuery
-   wait-for-completion? :- s/Bool
-   refresh? :- Refresh]
+   opts :- CRUDOptions]
   (safe-es-read
    (client/post
     (delete-by-query-uri uri index-names)
     (merge default-opts
-           {:query-params {:refresh (name refresh?)
-                           :wait_for_completion wait-for-completion?}
+           {:query-params (select-keys opts [:refresh :wait_for_completion])
             :form-params {:query q}
             :connection-manager cm}))))
 

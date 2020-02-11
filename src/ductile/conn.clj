@@ -21,11 +21,9 @@
 
 (defn make-default-opts
   [{:keys [_source]}]
-  (if _source
-    (update default-opts
-            :query-params
-            #(assoc % :_source (clojure.string/join "," (map name  _source))))
-    default-opts))
+  (cond-> default-opts
+    _source (assoc-in [:query-params :_source]
+                      _source)))
 
 (defn make-connection-manager [cm-options]
   (make-reusable-conn-manager cm-options))

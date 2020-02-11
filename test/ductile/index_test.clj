@@ -107,7 +107,7 @@
     (es-doc/bulk-create-doc conn
                             (repeat 3 {:_index "test_alias"
                                        :foo :bar})
-                            "true")
+                            {:refresh "true"})
 
     (testing "rollover dry_run parameter should be properly applied when condition is met"
       (let [{:keys [rolled_over dry_run old_index new_index]}

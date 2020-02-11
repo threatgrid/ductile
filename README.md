@@ -56,7 +56,7 @@ It's currently compatible with Elasticsearch 7.X
                      {:id 1
                      :name "John Doe"
                      :description "an anonymous coward"}
-                     :wait_for)
+                     {:refresh "wait_for"})
   ```
   ``` javascript
   {:id 1, :name "John Doe", :description "an anonymous coward"}
@@ -69,7 +69,7 @@ It's currently compatible with Elasticsearch 7.X
                      {:id 1
                       :name "Jane Doe"
                       :description "another anonymous coward"}
-                     :wait_for)
+                     {:refresh "wait_for"})
   ;; Execution error (ExceptionInfo) at ductile.conn/safe-es-read (conn.clj:54).
   ;; ES query failed
   ```
@@ -91,7 +91,7 @@ It's currently compatible with Elasticsearch 7.X
                      "test-index"
                      {:name "Jane Doe 2"
                       :description "yet another anonymous coward"}
-                     :wait_for)
+                     {:refresh "wait_for"})
   ```
   ``` javascript
    {:_index "test-index",
@@ -110,13 +110,13 @@ It's currently compatible with Elasticsearch 7.X
                     {:id 2
                      :name "Jane Doe"
                      :description "another anonymous coward"}
-                    :wait_for)
+                    {:refresh "wait_for"})
   
   (es-doc/index-doc c
                     "test-index"
                     {:name "John Doe"
                      :description "not so anonymous coward"}
-                    :wait_for)
+                    {:refresh "wait_for"})
   ```                  
   the 4th parameter offers to set the `refresh` parameter and can take same string values as corresponding ES query parameter: `true`, 'false', 'wait_for'
 
@@ -127,7 +127,7 @@ It's currently compatible with Elasticsearch 7.X
                      1
                      {:age 36
                       :description "anonymous but known age"}
-                     :wait_for)
+                     {:refresh "wait_for"})
   ```
   it returns the patched document
   ```javascript
@@ -149,8 +149,16 @@ It's currently compatible with Elasticsearch 7.X
   (es-doc/delete-doc c
                     "test-index"
                     1
-                    :wait_for)
+                    {:refresh "wait_for"})
    ;; true
+   
+   ;;you can also delete documents by query
+   (es-doc/delete-by-query conn
+                          ["test_index-1"]
+                          {:query_string {:query "anonymous"}}
+                          {:wait_for_completion true
+                          :refresh "true"})))
+   
    ```
 
 * and of course you can query it!

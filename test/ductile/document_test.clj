@@ -42,9 +42,8 @@
 (deftest update-doc-uri-test
   (is (= (sut/update-doc-uri "http://127.0.0.1"
                                 "test_index"
-                                "test"
-                                42)
-         "http://127.0.0.1/test_index/_update/test?retry_on_conflict=42"))  )
+                                "test")
+         "http://127.0.0.1/test_index/_update/test"))  )
 
 
 (deftest params->pagination-test
@@ -136,7 +135,7 @@
                    (select-keys (sut/create-doc conn
                                                 "test_index"
                                                 sample-doc
-                                                "true")
+                                                {:refresh "true"})
                                 [:_id :_type :result])))
             (is (= sample-doc (get-sample-doc)))
             (testing "creating without id"
@@ -144,7 +143,7 @@
                     {:keys [_id result]} (sut/create-doc conn
                                                          "test_index"
                                                          wo-id-doc
-                                                         "true")]
+                                                         {:refresh "true"})]
                 (is (= "created" result))
                 (is (= wo-id-doc
                        (sut/get-doc conn
@@ -156,7 +155,7 @@
                            (sut/create-doc conn
                                            "test_index"
                                            sample-doc
-                                           "true"))))
+                                           {:refresh "true"}))))
             (testing "with field selection"
               (is (= {:foo "bar is a lie"}
                      (sut/get-doc conn
@@ -173,16 +172,16 @@
                                      "test_index"
                                      (:id sample-doc)
                                      update1
-                                     "true")))
+                                     {:refresh "true"})))
               (is (= updated-doc1 (get-sample-doc)))
               (testing "with params"
                 (is (= updated-doc2
                        (sut/update-doc conn
-                                          "test_index"
-                                          (:id sample-doc)
-                                          update2
-                                          "true"
-                                          {:retry-on-conflict 10})))
+                                       "test_index"
+                                       (:id sample-doc)
+                                       update2
+                                       {:refresh "true"
+                                        :retry_on_conflict 10})))
                 (is (= updated-doc2 (get-sample-doc))))))
           (testing "index-doc"
             (testing "updating a field"
@@ -191,7 +190,7 @@
                        (:result (sut/index-doc conn
                                                "test_index"
                                                indexed-doc
-                                               "true"))))
+                                               {:refresh "true"}))))
                 (is (= indexed-doc (get-sample-doc)))))
             (testing "removing a field"
               (let [indexed-doc (dissoc sample-doc :test_value)]
@@ -199,26 +198,25 @@
                        (:result (sut/index-doc conn
                                                "test_index"
                                                indexed-doc
-                                               "true"))))
+                                               {:refresh "true"}))))
                 (is (= indexed-doc (get-sample-doc)))
                 ;; restore with the initial values
                 (sut/index-doc conn
                                "test_index"
                                sample-doc
-                               "true"))))
+                               {:refresh "true"}))))
           (testing "bulk-create-doc"
             (is (= sample-docs
                    (sut/bulk-create-doc conn
-                                           sample-docs
-                                           "true")))
+                                        sample-docs
+                                        {:refresh "true"})))
             (testing "with partioning"
               (let [sample-docs-2 (map #(assoc % :test_value 43) sample-docs)]
                 (is (= sample-docs-2
                        (sut/bulk-create-doc conn
-                                               sample-docs-2
-                                               "true"
-                                               0)))
-
+                                            sample-docs-2
+                                            {:refresh "true"}
+                                            0)))
                 (is (= 10
                        (get-in (sut/search-docs conn
                                                    "test_index"
@@ -250,7 +248,7 @@
                (sut/delete-doc conn
                                "test_index"
                                (:id sample-doc)
-                               "true")))))
+                               {:refresh "true"})))))
 
       (es-index/delete! conn "test_index"))))
 
@@ -292,7 +290,7 @@
       (sut/create-doc conn
                          "test_index"
                          doc
-                         "true"))
+                         {:refresh "true"}))
     (is (apply = (repeatedly 30 search-query)))
     (es-index/delete! conn "test_index")))
 
@@ -304,7 +302,9 @@
         conn (es-conn/connect {:host "localhost" :port 9200})]
     (es-index/delete! conn "test_index")
     (es-index/create! conn "test_index" {})
-    (sut/bulk-create-doc conn sample-docs "true")
+    (sut/bulk-create-doc conn
+                         sample-docs
+                         {:refresh "true"})
     (is (= 10
            (sut/count-docs conn "test_index")
            (sut/count-docs conn "test_index")
@@ -329,7 +329,7 @@
         sample-3-ids (map :_id sample-3-docs)
         _ (es-index/delete! conn "test_index")
         _ (es-index/create! conn "test_index" {})
-        _ (sut/bulk-create-doc conn sample-docs "true")
+        _ (sut/bulk-create-doc conn sample-docs {:refresh "true"})
         ids-query-result-1 (sut/query conn
                                          "test_index"
                                          (query/ids sample-3-ids)
@@ -461,26 +461,26 @@
         q-ids-2 (query/ids ["3" "4"])]
     (es-index/delete! conn "test_index")
     (es-index/create! conn "test_index" {})
-    (sut/bulk-create-doc conn sample-docs-1 "true")
-    (sut/bulk-create-doc conn sample-docs-2 "true")
+    (sut/bulk-create-doc conn sample-docs-1 {:refresh "true"})
+    (sut/bulk-create-doc conn sample-docs-2 {:refresh "true"})
     (is (= 5
            (:deleted (sut/delete-by-query conn
-                                             ["test_index-1"]
-                                             q-term
-                                             true
-                                             "true")))
+                                          ["test_index-1"]
+                                          q-term
+                                          {:wait_for_completion true
+                                           :refresh "true"})))
         "delete-by-query should delete all documents that match a query for given index")
     (is (= 6
            (:deleted (sut/delete-by-query conn
-                                             ["test_index-1", "test_index-2"]
-                                             q-ids-1
-                                             true
-                                             "true")))
+                                          ["test_index-1", "test_index-2"]
+                                          q-ids-1
+                                          {:wait_for_completion true
+                                           :refresh "true"})))
         "delete-by-query should properly apply deletion on all given indices")
     (is (seq (:task (sut/delete-by-query conn
-                                            ["test_index-1", "test_index-2"]
-                                            q-ids-2
-                                            false
-                                            "true")))
+                                         ["test_index-1", "test_index-2"]
+                                         q-ids-2
+                                         {:wait_for_completion false
+                                          :refresh "true"})))
         "delete-by-query with wait-for-completion? set to false should directly return an answer before deletion with a task id")
     (es-index/delete! conn "test_index")))
