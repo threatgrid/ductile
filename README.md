@@ -73,9 +73,16 @@ It's currently compatible with Elasticsearch 7.X
   ;; Execution error (ExceptionInfo) at ductile.conn/safe-es-read (conn.clj:54).
   ;; ES query failed
   ```
-  it will return created document
+  it will return the document creation result
   ``` javascript
-  {:id "1", :name "Jane Doe", :description "another anonymous coward"}
+{:_index "test-index",
+ :_type "_doc",
+ :_id "1",
+ :_version 1,
+ :result "created",
+ :_shards {:total 2, :successful 1, :failed 0},
+ :_seq_no 0,
+ :_primary_term 1}
   ```
   
   ;; if you do not provide the id field, elasticsearch will insert the document and generate an id
@@ -87,7 +94,14 @@ It's currently compatible with Elasticsearch 7.X
                      :wait_for)
   ```
   ``` javascript
-  {:name "Jane Doe 2", :description "yet another anonymous coward", :id "EBD9L3ABLWPPOW84CV6I"}
+{:_index "test-index",
+ :_type "_doc",
+ :_id "EBD9L3ABLWPPOW84CV6I",
+ :_version 1,
+ :result "created",
+ :_shards {:total 2, :successful 1, :failed 0},
+ :_seq_no 0,
+ :_primary_term 1}
   ```
   
   you can similarly create a document with index-doc, but if the document already exists it will erase it
@@ -116,6 +130,7 @@ It's currently compatible with Elasticsearch 7.X
                       :description "anonymous but known age"}
                      :wait_for)
   ```
+  it returns the patched document
   ```javascript
   {:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}                   
    ```                  
