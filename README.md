@@ -14,12 +14,45 @@ It's currently compatible with Elasticsearch 7.X
 (def c (es-conn/connect {:host "localhost" :port 9200}))
 ```
 
+* index operations
+```clojure
+(require '[ductile.index :as es-index])
+
+(sut/index-exists? conn "new_index")
+;;false
+
+(def test-config {:settings {:number_of_shards 3
+                             :number_of_replicas 1
+                             :refresh_interval "1s"}
+                  :mappings {:properties {:name {:type :text}
+                                          :age {:type :long}
+                                          :description {:type :text}}}
+                  :aliases {:test-alias {}}})
+
+(es-index/create! c "test-index" test-config)
+
+;; you can then delete or close that index
+(es-index/close! c "test-index")
+(es-index/delete! c "test-index")
+
+
+;; you can also manage templates
+(es-index/create-template! c "test-index" test-config ["foo*" "bar*"])
+
+;; when the index-patterns are not provided, one will be generated from the name with a wildcard suffix
+;; for instance, the following template will have the index-patterns ["test-index*"]
+(es-index/create-template! c "test-index" test-config)
+
+(es-index/get-template c "test-index")
+(es-index/delete-template! c "test-index")
+```
+
 * crud operations
   * create a document, and use the id field as document id
   ``` clojure
   (require '[ductile.document :as es-doc]) 
   (es-doc/create-doc c
-                     "test_index"
+                     "test-index"
                      {:id 1
                      :name "John Doe"
                      :description "an anonymous coward"}
@@ -32,7 +65,7 @@ It's currently compatible with Elasticsearch 7.X
   if you try to create another document with the same id, it will throw an ExceptionInfo
   ``` clojure
   (es-doc/create-doc c
-                        "test_index"
+                        "test-index"
                      {:id 1
                       :name "Jane Doe"
                       :description "another anonymous coward"}
@@ -48,7 +81,7 @@ It's currently compatible with Elasticsearch 7.X
   ;; if you do not provide the id field, elasticsearch will insert the document and generate an id
   ``` clojure
   (es-doc/create-doc c
-                     "test_index"
+                     "test-index"
                      {:name "Jane Doe 2"
                       :description "yet another anonymous coward"}
                      :wait_for)
@@ -60,14 +93,14 @@ It's currently compatible with Elasticsearch 7.X
   you can similarly create a document with index-doc, but if the document already exists it will erase it
   ``` clojure
   (es-doc/index-doc c
-                    "test_index"
+                    "test-index"
                     {:id 2
                      :name "Jane Doe"
                      :description "another anonymous coward"}
                     :wait_for)
   
   (es-doc/index-doc c
-                    "test_index"
+                    "test-index"
                     {:name "John Doe"
                      :description "not so anonymous coward"}
                     :wait_for)
@@ -77,10 +110,10 @@ It's currently compatible with Elasticsearch 7.X
   * patch a document
   ```clojure
   (es-doc/update-doc c
-                     "test_index"
+                     "test-index"
                      1
                      {:age 36
-                      :description "anonymous with know age"}
+                      :description "anonymous but known age"}
                      :wait_for)
   ```
   ```javascript
@@ -89,7 +122,7 @@ It's currently compatible with Elasticsearch 7.X
   * retrieve a document 
   ```clojure
   (es-doc/get-doc c
-                  "test_index"
+                  "test-index"
                   1
                   {})
      ```
@@ -100,7 +133,7 @@ It's currently compatible with Elasticsearch 7.X
    * delete a document
   ``` clojure
   (es-doc/delete-doc c
-                    "test_index"
+                    "test-index"
                     1
                     :wait_for)
    ;; true
@@ -111,33 +144,36 @@ you can either provide classical elasticsearch queries or use some helpers from 
 ```clojure
 (require `[ductile.query :as es-query])
 (es-doc/query c
-              "test_index"
+              "test-index"
               (es-query/ids [1 2])
               {})
 ```
 ``` javascript
-{:data ({:id 2, :name "Jane Doe", :description "another anonymous coward"}), :paging {:total-hits 1}}
+{:data
+ ({:id 2, :name "Jane Doe", :description "another anonymous coward"}),
+ :paging {:total-hits 1}}
 ```
 if you need all metadata you can use the full-hits? option
 ``` clojure
 (clojure.pprint/pprint
   (es-doc/query c
-                "test_index"
+                "test-index"
                 {:match_all {}}
                 {:full-hits? true
                  :sort {"id" {:order :desc}}
                  :limit 2}))
 ```
+it will return not only the matched documents but also meta data like `_index` and `_score`
 ``` javascript
 {:data
- [{:_index "test_index",
+ [{:_index "test-index",
    :_type "_doc",
    :_id "2",
    :_score nil,
    :_source
    {:id 2, :name "Jane Doe", :description "another anonymous coward"},
    :sort [2]}
-  {:_index "test_index",
+  {:_index "test-index",
    :_type "_doc",
    :_id "1",
    :_score nil,
@@ -148,6 +184,14 @@ if you need all metadata you can use the full-hits? option
  {:total-hits 3,
   :next {:limit 2, :offset 2, :search_after [1]},
   :sort [1]}}
+```
+Ductile also provides a search function with a simple interface that offers to use a Mongo like filters lucene query string to easily match documents
+``` clojure
+(es-doc/search-docs c
+                    "test-index"
+                    {:query_string {:query "anonymous"}}
+                    {:age 36}
+                    {:sort {:name {:order :desc}}})
 ```
 
 

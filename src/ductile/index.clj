@@ -104,16 +104,23 @@
 
 (s/defn create-template!
   "create an index template, update if already exists"
-  [{:keys [uri cm]} :- ESConn
-   index-name :- s/Str
-   index-config]
-  (let [template (str index-name "*")
-        opts (assoc index-config :index_patterns template)]
+  ([{:keys [uri cm]} :- ESConn
+    template-name :- s/Str
+    index-config
+    index-patterns :- [s/Str]]
+  (let [opts (assoc index-config :index_patterns index-patterns)]
     (safe-es-read
-     (client/put (template-uri uri index-name)
+     (client/put (template-uri uri template-name)
                  (merge default-opts
                         {:form-params opts
                          :connection-manager cm})))))
+  ([es-conn :- ESConn
+    template-name :- s/Str
+    index-config]
+   (create-template! es-conn
+                     template-name
+                     index-config
+                     [(str template-name "*")])))
 
 (s/defn delete-template!
   "delete a template"

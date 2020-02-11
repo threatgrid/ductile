@@ -43,7 +43,8 @@
    (assoc
      (uri/uri uri
               (uri/uri-encode index-name)
-              (uri/uri-encode id) "_update")
+              "_update"
+              (uri/uri-encode id))
     :query {:retry_on_conflict
             retry-on-conflict})))
 
@@ -111,14 +112,13 @@
    {:keys [refresh op_type]}]
   (let [query-params (cond-> {}
                        refresh (assoc :refresh (name refresh))
-                       op_type (assoc :op_type op_type))
-        {:keys [_id]} (safe-es-read
-               (client/post (index-doc-uri uri index-name id)
-                            (merge default-opts
-                                   {:form-params doc
-                                    :query-params query-params
-                                    :connection-manager cm})))]
-    (assoc doc :id _id)))
+                       op_type (assoc :op_type op_type))]
+    (safe-es-read
+     (client/post (index-doc-uri uri index-name id)
+                  (merge default-opts
+                         {:form-params doc
+                          :query-params query-params
+                          :connection-manager cm})))))
 
 (s/defn index-doc
   "index a document on es return the indexed document"
@@ -127,8 +127,7 @@
     doc :- s/Any
     refresh? :- Refresh]
    (index-doc-internal es-conn index-name doc {:refresh refresh?}))
-  ([es-conn index-name doc] (index-doc-internal))
-  )
+  ([es-conn index-name doc] (index-doc-internal)))
 
 (s/defn create-doc
   "create a document on es return the created document"

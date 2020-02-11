@@ -1,7 +1,8 @@
 (ns ductile.document-test
+  (:import clojure.lang.ExceptionInfo)
   (:require [ductile
+             [document :as sut]
              [conn :as es-conn]
-             [document :as es-doc]
              [index :as es-index]
              [query :as query]]
             [schema.test :refer [validate-schemas]]
@@ -12,69 +13,69 @@
 (deftest search-uri-test
   (testing "should generate a valid _search uri"
     (is (= "http://localhost:9200/ctia_tool/_search"
-           (es-doc/search-uri "http://localhost:9200"
+           (sut/search-uri "http://localhost:9200"
                               "ctia_tool")))
     (is (= "http://localhost:9200/_search"
-           (es-doc/search-uri "http://localhost:9200"
+           (sut/search-uri "http://localhost:9200"
                               nil)))))
 
 (deftest delete-by-query-uri-test
   (testing "should generate a valid delete_by_query uri"
     (is (= "http://localhost:9200/ctim/_delete_by_query"
-           (es-doc/delete-by-query-uri "http://localhost:9200"
+           (sut/delete-by-query-uri "http://localhost:9200"
                                        ["ctim"])))
     (is (= "http://localhost:9200/ctim%2Cctia/_delete_by_query"
-           (es-doc/delete-by-query-uri "http://localhost:9200"
+           (sut/delete-by-query-uri "http://localhost:9200"
                                        ["ctim", "ctia"])))))
 
 (deftest index-doc-uri-test
   (testing "should generate a valid doc URI"
     (is (= "http://127.0.0.1/test_index/_doc/test"
-           (es-doc/index-doc-uri "http://127.0.0.1"
+           (sut/index-doc-uri "http://127.0.0.1"
                                   "test_index"
                                   "test")))
     (is (= "http://127.0.0.1/test_index/_doc/test%2Ffoo%2Fbar"
-           (es-doc/index-doc-uri "http://127.0.0.1"
+           (sut/index-doc-uri "http://127.0.0.1"
                                   "test_index"
                                   "test/foo/bar")))))
 
 (deftest update-doc-uri-test
-  (is (= (es-doc/update-doc-uri "http://127.0.0.1"
+  (is (= (sut/update-doc-uri "http://127.0.0.1"
                                 "test_index"
                                 "test"
                                 42)
-         "http://127.0.0.1/test_index/test/_update?retry_on_conflict=42"))  )
+         "http://127.0.0.1/test_index/_update/test?retry_on_conflict=42"))  )
 
 
 (deftest params->pagination-test
   (is (= {:size 100
           :sort {"field1" {:order :asc}}}
-         (es-doc/params->pagination {:sort_by :field1})))
+         (sut/params->pagination {:sort_by :field1})))
 
   (is (= {:size 100
           :sort {"field1" {:order :desc}}}
-         (es-doc/params->pagination {:sort_by "field1:desc"})
-         (es-doc/params->pagination {:sort_by "field1:desc"
+         (sut/params->pagination {:sort_by "field1:desc"})
+         (sut/params->pagination {:sort_by "field1:desc"
                                      :sort_order :asc})))
 
   (is (= {:size 100
           :sort {"field1" {:order :desc}
                  "field2" {:order :asc}
                  "field3" {:order :desc}}}
-         (es-doc/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"})
-         (es-doc/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"
+         (sut/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"})
+         (sut/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"
                                      :sort_order :asc})))
 
   (is (= {:size 100
           :from 1000
           :sort {"field1" {:order :asc}}}
-         (es-doc/params->pagination {:sort_by :field1
+         (sut/params->pagination {:sort_by :field1
                                      :offset 1000})))
 
   (is (= {:size 10000
           :from 1000
           :sort {"field1" {:order :asc}}}
-         (es-doc/params->pagination {:sort_by :field1
+         (sut/params->pagination {:sort_by :field1
                                      :offset 1000
                                      :limit 10000})))
 
@@ -82,31 +83,31 @@
           :from 0
           :search_after ["value1"]
           :sort {"field1" {:order :asc}}}
-         (es-doc/params->pagination {:sort_by :field1
+         (sut/params->pagination {:sort_by :field1
                                      :offset 1000
                                      :limit 10000
                                      :search_after ["value1"]})
-         (es-doc/params->pagination {:sort_by :field1
+         (sut/params->pagination {:sort_by :field1
                                      :limit 10000
                                      :search_after ["value1"]}))))
 
 (deftest generate-es-params-test
   (is (= {:size 10 :from 20}
-         (es-doc/generate-es-params nil nil {:limit 10 :offset 20}))
+         (sut/generate-es-params nil nil {:limit 10 :offset 20}))
       "generate-es-params should properly format pagination parameters")
   (is (= {:size 100}
-         (es-doc/generate-es-params nil nil {}))
+         (sut/generate-es-params nil nil {}))
       "generate-es-params should apply default query values")
   (is (= {:query {:match_all {}}
           :size 10}
-         (es-doc/generate-es-params {:match_all {}} nil {:limit 10}))
+         (sut/generate-es-params {:match_all {}} nil {:limit 10}))
       "generate-es-params should set :query with query passed as parameter")
   (let [aggs {:docs_by_week
               {:date_histogram
                {:field "timestamp"
                 :interval "week"}}}]
     (is (= {:aggs aggs :size 0}
-           (es-doc/generate-es-params nil aggs {:limit 0}))
+           (sut/generate-es-params nil aggs {:limit 0}))
         "generate-es-params should set :aggs with aggs passed as parameter")))
 
 (deftest ^:integration document-crud-ops
@@ -123,27 +124,42 @@
               (repeatedly 10 #(hash-map :id (.toString (java.util.UUID/randomUUID))
                                         :_index "test_index"
                                         :bar "foo"))
-              get-sample-doc #(es-doc/get-doc conn
-                                              "test_index"
-                                              (:id sample-doc)
-                                              {})]
+              get-sample-doc #(sut/get-doc conn
+                                           "test_index"
+                                           (:id sample-doc)
+                                           {})]
           (testing "create-doc and get-doc"
             (is (nil? (get-sample-doc)))
-            (is (= sample-doc
-                   (es-doc/create-doc conn
-                                      "test_index"
-                                      sample-doc
-                                      "true")))
+            (is (= {:_id (-> sample-doc :id str)
+                    :_type "_doc"
+                    :result "created"}
+                   (select-keys (sut/create-doc conn
+                                                "test_index"
+                                                sample-doc
+                                                "true")
+                                [:_id :_type :result])))
             (is (= sample-doc (get-sample-doc)))
+            (testing "creating without id"
+              (let [wo-id-doc (dissoc sample-doc :id)
+                    {:keys [_id result]} (sut/create-doc conn
+                                                         "test_index"
+                                                         wo-id-doc
+                                                         "true")]
+                (is (= "created" result))
+                (is (= wo-id-doc
+                       (sut/get-doc conn
+                                    "test_index"
+                                    _id
+                                    {})))))
             (testing "existing doc"
               (is (thrown? clojure.lang.ExceptionInfo
-                           (es-doc/create-doc conn
-                                              "test_index"
-                                              sample-doc
-                                              "true"))))
+                           (sut/create-doc conn
+                                           "test_index"
+                                           sample-doc
+                                           "true"))))
             (testing "with field selection"
               (is (= {:foo "bar is a lie"}
-                     (es-doc/get-doc conn
+                     (sut/get-doc conn
                                      "test_index"
                                      (:id sample-doc)
                                      {:_source ["foo"]})))))
@@ -153,15 +169,15 @@
                   update2 {:test_value 55}
                   updated-doc2 (into sample-doc update2)]
               (is (= updated-doc1
-                     (es-doc/update-doc conn
-                                        "test_index"
-                                        (:id sample-doc)
-                                        update1
-                                        "true")))
+                     (sut/update-doc conn
+                                     "test_index"
+                                     (:id sample-doc)
+                                     update1
+                                     "true")))
               (is (= updated-doc1 (get-sample-doc)))
               (testing "with params"
                 (is (= updated-doc2
-                       (es-doc/update-doc conn
+                       (sut/update-doc conn
                                           "test_index"
                                           (:id sample-doc)
                                           update2
@@ -171,83 +187,86 @@
           (testing "index-doc"
             (testing "updating a field"
               (let [indexed-doc (assoc sample-doc :test_value 66)]
-                (is (= indexed-doc
-                       (es-doc/index-doc conn
-                                         "test_index"
-                                         indexed-doc
-                                         "true")))
+                (is (= "updated"
+                       (:result (sut/index-doc conn
+                                               "test_index"
+                                               indexed-doc
+                                               "true"))))
                 (is (= indexed-doc (get-sample-doc)))))
             (testing "removing a field"
               (let [indexed-doc (dissoc sample-doc :test_value)]
-                (is (= indexed-doc
-                       (es-doc/index-doc conn
-                                         "test_index"
-                                         indexed-doc
-                                         "true")))
+                (is (= "updated"
+                       (:result (sut/index-doc conn
+                                               "test_index"
+                                               indexed-doc
+                                               "true"))))
                 (is (= indexed-doc (get-sample-doc)))
                 ;; restore with the initial values
-                (es-doc/index-doc conn
-                                  "test_index"
-                                  sample-doc
-                                  "true"))))
+                (sut/index-doc conn
+                               "test_index"
+                               sample-doc
+                               "true"))))
           (testing "bulk-create-doc"
             (is (= sample-docs
-                   (es-doc/bulk-create-doc conn
+                   (sut/bulk-create-doc conn
                                            sample-docs
                                            "true")))
             (testing "with partioning"
               (let [sample-docs-2 (map #(assoc % :test_value 43) sample-docs)]
                 (is (= sample-docs-2
-                       (es-doc/bulk-create-doc conn
+                       (sut/bulk-create-doc conn
                                                sample-docs-2
                                                "true"
                                                0)))
 
                 (is (= 10
-                       (get-in (es-doc/search-docs conn
+                       (get-in (sut/search-docs conn
                                                    "test_index"
                                                    {:query_string {:query "*"}}
                                                    {:test_value 43}
                                                    {:sort_by "test_value"
                                                     :sort_order :desc})
                                [:paging :total-hits]))))))
-          (is (= {:data [sample-doc]
-                  :paging {:total-hits 1
+          (is (= {:data #{sample-doc (dissoc sample-doc :id)}
+                  :paging {:total-hits 2
                            :sort [42]}}
-                 (es-doc/search-docs conn
-                                     "test_index"
-                                     {:query_string {:query "bar"}}
-                                     {:test_value 42}
-                                     {:sort_by "test_value"
-                                      :sort_order :desc})
-                 (es-doc/search-docs conn
-                                     "test_index"
-                                     {:query_string {:query "bar"}}
-                                     {:test_value 42}
-                                     {:sort_by "test_value"
-                                      :sort_order :desc})))
-
+                 (update
+                  (sut/search-docs conn
+                                   "test_index"
+                                   {:query_string {:query "bar"}}
+                                   {:test_value 42}
+                                   {:sort_by "test_value"
+                                    :sort_order :desc})
+                  :data set)
+                 (update
+                  (sut/search-docs conn
+                                   "test_index"
+                                   {:query_string {:query "bar"}}
+                                   {:test_value 42}
+                                   {:sort_by "test_value"
+                                    :sort_order :desc})
+                  :data set)))
           (is (true?
-               (es-doc/delete-doc conn
-                                  "test_index"
-                                  (:id sample-doc)
-                                  "true")))))
+               (sut/delete-doc conn
+                               "test_index"
+                               (:id sample-doc)
+                               "true")))))
 
       (es-index/delete! conn "test_index"))))
 
 (deftest partition-json-ops-test
   (is (= [["ops1"] ["ops2"] ["ops3--"]]
-         (es-doc/partition-json-ops
+         (sut/partition-json-ops
           ["ops1" "ops2" "ops3--"]
           1))
       "All elements are in a group if the max size is exceeded")
   (is (= [["ops1" "ops2"] ["ops3--"]]
-         (es-doc/partition-json-ops
+         (sut/partition-json-ops
           ["ops1" "ops2" "ops3--"]
           8))
       "The max size is used to partition ops")
   (is (= [["ops1" "ops2" "ops3--"]]
-         (es-doc/partition-json-ops
+         (sut/partition-json-ops
           ["ops1" "ops2" "ops3--"]
           1000))
       "All ops are in the same group"))
@@ -261,7 +280,7 @@
                       :test "ok")
            (range 1000)))
         conn (es-conn/connect {:host "localhost" :port 9200})
-        search-query #(get-in (es-doc/search-docs conn
+        search-query #(get-in (sut/search-docs conn
                                                   "test_index"
                                                   nil
                                                   {}
@@ -270,7 +289,7 @@
     (es-index/delete! conn "test_index")
     (es-index/create! conn "test_index" {})
     (doseq [doc docs]
-      (es-doc/create-doc conn
+      (sut/create-doc conn
                          "test_index"
                          doc
                          "true"))
@@ -285,13 +304,13 @@
         conn (es-conn/connect {:host "localhost" :port 9200})]
     (es-index/delete! conn "test_index")
     (es-index/create! conn "test_index" {})
-    (es-doc/bulk-create-doc conn sample-docs "true")
+    (sut/bulk-create-doc conn sample-docs "true")
     (is (= 10
-           (es-doc/count-docs conn "test_index")
-           (es-doc/count-docs conn "test_index")
-           (es-doc/count-docs conn "test_index" {:term {:foo :bar}})
-           (es-doc/count-docs conn "test_index" {:match_all {}})))
-    (is (= 3 (es-doc/count-docs conn "test_index" {:ids {:values (range 3)}})))
+           (sut/count-docs conn "test_index")
+           (sut/count-docs conn "test_index")
+           (sut/count-docs conn "test_index" {:term {:foo :bar}})
+           (sut/count-docs conn "test_index" {:match_all {}})))
+    (is (= 3 (sut/count-docs conn "test_index" {:ids {:values (range 3)}})))
     (es-index/delete! conn "test_index")))
 
 (defn is-full-hits?
@@ -310,16 +329,16 @@
         sample-3-ids (map :_id sample-3-docs)
         _ (es-index/delete! conn "test_index")
         _ (es-index/create! conn "test_index" {})
-        _ (es-doc/bulk-create-doc conn sample-docs "true")
-        ids-query-result-1 (es-doc/query conn
+        _ (sut/bulk-create-doc conn sample-docs "true")
+        ids-query-result-1 (sut/query conn
                                          "test_index"
                                          (query/ids sample-3-ids)
                                          {})
-        ids-query-result-2 (es-doc/query conn
+        ids-query-result-2 (sut/query conn
                                          "test_index"
                                          (query/ids sample-3-ids)
                                          {:full-hits? true})
-        search_after-result (es-doc/query conn
+        search_after-result (sut/query conn
                                           "test_index"
                                           {:match_all {}}
                                           {:limit 2
@@ -328,7 +347,7 @@
         avg-aggs {:avg_price {:avg {:field :price}}}
         {data-aggs-1 :data
          aggs-1 :aggs
-         paging-aggs-1 :paging} (es-doc/query conn
+         paging-aggs-1 :paging} (sut/query conn
                                               "test_index"
                                               {:match_all {}}
                                               avg-aggs
@@ -336,14 +355,14 @@
 
         stats-aggs {:price_stats {:stats {:field :price}}}
         {data-aggs-2 :data
-         aggs-2 :aggs} (es-doc/query conn
+         aggs-2 :aggs} (sut/query conn
                                      "test_index"
                                      {:match_all {}}
                                      stats-aggs
                                      {:limit 0})
         stats-aggs {:price_stats {:stats {:field :price}}}
         {data-aggs-3 :data
-         aggs-3 :aggs} (es-doc/query conn
+         aggs-3 :aggs} (sut/query conn
                                      "test_index"
                                      (query/ids (map :_id (take 3 sample-docs)))
                                      stats-aggs
@@ -368,26 +387,26 @@
       (is (not-any? is-full-hits? (:data ids-query-result-1))
           "by default, full-hits? is set to false"))
     (testing "track_total_hits should be properly considered"
-      (is (= 2 (-> (es-doc/query conn
+      (is (= 2 (-> (sut/query conn
                                  "test_index"
                                  (query/ids sample-3-ids)
                                  {:track_total_hits 2})
                    :paging
                    :total-hits)))
       (is (= 3
-             (-> (es-doc/query conn
+             (-> (sut/query conn
                                "test_index"
                                (query/ids sample-3-ids)
                                {:track_total_hits true})
                  :paging
                  :total-hits)
-             (-> (es-doc/query conn
+             (-> (sut/query conn
                                "test_index"
                                (query/ids sample-3-ids)
                                {})
                  :paging
                  :total-hits)))
-      (is (= 0 (-> (es-doc/query conn
+      (is (= 0 (-> (sut/query conn
                                  "test_index"
                                  (query/ids sample-3-ids)
                                  {:track_total_hits false})
@@ -442,23 +461,23 @@
         q-ids-2 (query/ids ["3" "4"])]
     (es-index/delete! conn "test_index")
     (es-index/create! conn "test_index" {})
-    (es-doc/bulk-create-doc conn sample-docs-1 "true")
-    (es-doc/bulk-create-doc conn sample-docs-2 "true")
+    (sut/bulk-create-doc conn sample-docs-1 "true")
+    (sut/bulk-create-doc conn sample-docs-2 "true")
     (is (= 5
-           (:deleted (es-doc/delete-by-query conn
+           (:deleted (sut/delete-by-query conn
                                              ["test_index-1"]
                                              q-term
                                              true
                                              "true")))
         "delete-by-query should delete all documents that match a query for given index")
     (is (= 6
-           (:deleted (es-doc/delete-by-query conn
+           (:deleted (sut/delete-by-query conn
                                              ["test_index-1", "test_index-2"]
                                              q-ids-1
                                              true
                                              "true")))
         "delete-by-query should properly apply deletion on all given indices")
-    (is (seq (:task (es-doc/delete-by-query conn
+    (is (seq (:task (sut/delete-by-query conn
                                             ["test_index-1", "test_index-2"]
                                             q-ids-2
                                             false
