@@ -1,6 +1,6 @@
 (ns ductile.query-test
   (:require [ductile.query :as sut]
-            [clojure.test :refer :all]))
+            [clojure.test :refer [deftest is]]))
 
 
 (deftest prepare-terms

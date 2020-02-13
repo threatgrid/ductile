@@ -6,6 +6,7 @@
              [index :as es-index]
              [query :as query]]
             [schema.test :refer [validate-schemas]]
+            [clj-http.fake :refer [with-fake-routes-in-isolation]]
             [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :once validate-schemas)
@@ -90,24 +91,24 @@
                                      :limit 10000
                                      :search_after ["value1"]}))))
 
-(deftest generate-es-params-test
+(deftest generate-search-params-test
   (is (= {:size 10 :from 20}
-         (sut/generate-es-params nil nil {:limit 10 :offset 20}))
-      "generate-es-params should properly format pagination parameters")
+         (sut/generate-search-params nil nil {:limit 10 :offset 20}))
+      "generate-search-params should properly format pagination parameters")
   (is (= {:size 100}
-         (sut/generate-es-params nil nil {}))
-      "generate-es-params should apply default query values")
+         (sut/generate-search-params nil nil {}))
+      "generate-search-params should apply default query values")
   (is (= {:query {:match_all {}}
           :size 10}
-         (sut/generate-es-params {:match_all {}} nil {:limit 10}))
-      "generate-es-params should set :query with query passed as parameter")
+         (sut/generate-search-params {:match_all {}} nil {:limit 10}))
+      "generate-search-params should set :query with query passed as parameter")
   (let [aggs {:docs_by_week
               {:date_histogram
                {:field "timestamp"
                 :interval "week"}}}]
     (is (= {:aggs aggs :size 0}
-           (sut/generate-es-params nil aggs {:limit 0}))
-        "generate-es-params should set :aggs with aggs passed as parameter")))
+           (sut/generate-search-params nil aggs {:limit 0}))
+        "generate-search-params should set :aggs with aggs passed as parameter")))
 
 (deftest ^:integration document-crud-ops
   (testing "with ES conn test setup"
@@ -150,8 +151,23 @@
                                     "test_index"
                                     _id
                                     {})))))
-            (testing "existing doc"
-              (is (thrown? clojure.lang.ExceptionInfo
+            (testing "with custom mk-id"
+              (let [doc-id (str (java.util.UUID/randomUUID))
+                    doc {:description "Lorem ipsum dolor sit amet"}
+                    {:keys [_id result]} (sut/create-doc conn
+                                                         "test_index"
+                                                         doc
+                                                         {:mk-id (constantly doc-id)
+                                                          :refresh "true"})]
+                (is (= "created" result))
+                (is (= _id doc-id))
+                (is (= doc
+                       (sut/get-doc conn
+                                    "test_index"
+                                    doc-id
+                                    {})))))
+            (testing "existing doc id"
+              (is (thrown? ExceptionInfo
                            (sut/create-doc conn
                                            "test_index"
                                            sample-doc

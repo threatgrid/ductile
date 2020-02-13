@@ -1,10 +1,8 @@
 (ns ductile.conn
   (:require [clj-http.conn-mgr :refer [make-reusable-conn-manager]]
             [clojure.tools.logging :as log]
-            [ductile.schemas :refer [ESConn ConnectParams]]
-            [schema.core :as s])
-  (:import [org.apache.http.impl.conn PoolingClientConnectionManager
-            PoolingHttpClientConnectionManager]))
+            [ductile.schemas :refer [ConnectParams ESConn]]
+            [schema.core :as s]))
 
 (def default-timeout 30000)
 
@@ -16,14 +14,22 @@
 (def default-opts
   {:as :json
    :content-type :json
-   :throw-exceptions false
-   :query-params {}})
+   :throw-exceptions false})
 
-(defn make-default-opts
-  [{:keys [_source]}]
-  (cond-> default-opts
-    _source (assoc-in [:query-params :_source]
-                      _source)))
+(defn make-http-opts
+  ([cm
+    opts
+    query-params-keys
+    form-params
+    body]
+   (cond-> default-opts
+     body (assoc :body body)
+     form-params (assoc :form-params form-params)
+     cm (assoc :connection-manager cm)
+     (seq query-params-keys) (assoc :query-params
+                                     (select-keys opts query-params-keys))))
+  ([cm opts query-params-keys] (make-http-opts cm opts query-params-keys nil nil))
+  ([cm] (make-http-opts cm {} [] nil nil)))
 
 (defn make-connection-manager [cm-options]
   (make-reusable-conn-manager cm-options))
@@ -40,7 +46,7 @@
 
 (defn safe-es-read [{:keys [status body]
                      :as res}]
-  (case status
+  (case (int status)
     200 body
     201 body
     404 nil

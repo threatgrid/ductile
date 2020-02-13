@@ -1,17 +1,14 @@
 (ns ductile.document
-  (:require [cheshire.core :as json]
+  (:require [cemerick.uri :as uri]
+            [cheshire.core :as json]
             [clj-http.client :as client]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
-            [cemerick.uri :as uri]
             [ductile
-             [conn :refer [default-opts
-                           safe-es-read
-                           safe-es-bulk-read
-                           make-default-opts]]
-             [schemas :refer [ESAggs ESConn ESQuery CRUDOptions]]
+             [conn :as conn]
              [pagination :as pagination]
-             [query :as q]]
+             [query :as q]
+             [schemas :refer [CRUDOptions ESAggs ESConn ESQuery]]]
             [schema.core :as s]))
 
 (def default-limit 1000)
@@ -102,9 +99,8 @@
   (-> (client/get (get-doc-uri uri
                                index-name
                                id)
-                  (assoc (make-default-opts opts)
-                         :connection-manager cm))
-      safe-es-read
+                  (conn/make-http-opts cm opts [:_source]))
+      conn/safe-es-read
       :_source))
 
 (s/defn index-doc-internal
@@ -114,13 +110,9 @@
    {:keys [mk-id]
     :or {mk-id :id}
     :as opts} :- CRUDOptions]
-  (let [query-params (select-keys opts [:refresh :op_type])]
-    (safe-es-read
-     (client/post (index-doc-uri uri index-name (mk-id doc))
-                  (merge default-opts
-                         {:form-params doc
-                          :query-params query-params
-                          :connection-manager cm})))))
+  (conn/safe-es-read
+   (client/post (index-doc-uri uri index-name (mk-id doc))
+                (conn/make-http-opts cm opts [:refresh :op_type] doc nil))))
 
 (s/defn index-doc
   "index a document on es return the indexed document"
@@ -129,7 +121,7 @@
     doc :- s/Any
     opts :- CRUDOptions]
    (index-doc-internal es-conn index-name doc opts))
-  ([es-conn index-name doc] (index-doc-internal)))
+  ([es-conn index-name doc] (index-doc-internal es-conn index-name doc {})))
 
 (s/defn create-doc
   "create a document on es return the created document"
@@ -177,12 +169,13 @@
                       (interleave (repeat "\n"))
                       string/join)]
     (-> (client/post (bulk-uri uri)
-                     (merge default-opts
-                            {:connection-manager cm
-                             :query-params (select-keys opts [:refresh])
-                             :body bulk-body}))
-        safe-es-read
-        safe-es-bulk-read)))
+                     (conn/make-http-opts cm
+                                          opts
+                                          [:refresh]
+                                          nil
+                                          bulk-body))
+        conn/safe-es-read
+        conn/safe-es-bulk-read)))
 
 (s/defn bulk-create-doc
   "create multiple documents on ES and return the created documents"
@@ -216,15 +209,14 @@
    opts :- CRUDOptions]
   (-> (client/post
        (update-doc-uri uri index-name id)
-       (merge default-opts
-              {:form-params {:doc doc}
-               :query-params (into {:_source true
-                                    :retry_on_conflict default-retry-on-conflict}
-                                   (select-keys opts [:refresh
-                                                      :retry_on_conflict
-                                                      :_source]))
-               :connection-manager cm}))
-      safe-es-read
+       (conn/make-http-opts cm
+                            (into {:_source true
+                                   :retry_on_conflict default-retry-on-conflict}
+                                  opts)
+                            [:_source :retry_on_conflict :refresh]
+                            {:doc doc}
+                            nil))
+      conn/safe-es-read
       (get-in [:get :_source])))
 
 (s/defn delete-doc
@@ -234,10 +226,8 @@
    id :- s/Str
    opts :- CRUDOptions]
   (-> (client/delete (delete-doc-uri uri index-name id)
-                     (merge default-opts
-                            {:query-params (select-keys opts [:refresh])
-                             :connection-manager cm}))
-      safe-es-read
+                     (conn/make-http-opts cm opts [:refresh]))
+      conn/safe-es-read
       :result
       (= "deleted")))
 
@@ -254,13 +244,14 @@
    index-names :- [s/Str]
    q :- ESQuery
    opts :- CRUDOptions]
-  (safe-es-read
+  (conn/safe-es-read
    (client/post
     (delete-by-query-uri uri index-names)
-    (merge default-opts
-           {:query-params (select-keys opts [:refresh :wait_for_completion])
-            :form-params {:query q}
-            :connection-manager cm}))))
+    (conn/make-http-opts cm
+                         opts
+                         [:refresh :wait_for_completion]
+                         {:query q}
+                         nil))))
 
 (defn sort-params
   [sort_by sort_order]
@@ -290,7 +281,7 @@
      {:from 0
       :search_after search_after})))
 
-(defn generate-es-params
+(defn generate-search-params
   [query aggs params]
   (cond-> (into (params->pagination params)
                 (select-keys params [:sort :_source :track_total_hits]))
@@ -304,11 +295,13 @@
    query :- (s/maybe ESQuery)]
    (-> (client/post
         (count-uri uri index-name)
-        (merge default-opts
-               (when query
-                 {:form-params {:query query}})
-               {:connection-manager cm}))
-       safe-es-read
+        (conn/make-http-opts cm
+                             {}
+                             []
+                             (when query
+                               {:query query})
+                             nil))
+       conn/safe-es-read
        :count))
   ([es-conn :- ESConn
     index-name :- s/Str]
@@ -344,15 +337,17 @@
     aggs :- (s/maybe ESAggs)
     {:keys [full-hits?]
      :as params} :- s/Any]
-   (let [es-params (generate-es-params q aggs params)
-         res (safe-es-read
+   (let [search-params (generate-search-params q aggs params)
+         res (conn/safe-es-read
               (client/post
                (search-uri uri index-name)
-               (into default-opts
-                     {:form-params es-params
-                      :connection-manager cm})))]
-     (log/debug "query:" es-params)
-     (format-result res es-params full-hits?)))
+               (conn/make-http-opts cm
+                                    {}
+                                    []
+                                    search-params
+                                    nil)))]
+     (log/debug "search:" search-params)
+     (format-result res search-params full-hits?)))
   ([es-conn index-name q params]
    (query es-conn index-name q nil params)))
 

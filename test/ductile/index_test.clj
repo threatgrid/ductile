@@ -1,5 +1,5 @@
 (ns ductile.index-test
-  (:require [clojure.test :refer [deftest is join-fixtures testing use-fixtures]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [ductile
              [index :as sut]
              [conn :as es-conn]

@@ -29,5 +29,7 @@
   :profiles {:uberjar {:aot :all}
              :dev {:dependencies
                    [[ch.qos.logback/logback-classic "1.2.3"]]
-                   :resource-paths ["test/resources"]}}
+                   :resource-paths ["test/resources"]}
+             :test {:dependencies
+                    [[clj-http-fake "1.0.3"]]}}
   :global-vars {*warn-on-reflection* true})

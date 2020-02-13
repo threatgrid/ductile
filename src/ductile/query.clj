@@ -36,13 +36,14 @@
   ([key values opts]
    (term key values opts)))
 
-(defn nested-terms [filters]
+(defn nested-terms
   "make nested terms from a filter:
   [[[:observable :type] ip] [[:observable :value] 42.42.42.1]]
   ->
   [{:terms {observable.type [ip]}} {:terms {observable.value [42.42.42.1]}}]
 
 we force all values to lowercase, since our indexing does the same for all terms."
+  [filters]
   (vec (map (fn [[k v]]
               (terms (->> k
                           (map name)
