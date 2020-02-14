@@ -84,8 +84,8 @@ It's currently compatible with Elasticsearch 7.X
     :_seq_no 0,
     :_primary_term 1}
   ```
-  
-  ;; if you do not provide the id field, elasticsearch will insert the document and generate an id
+
+  if you do not provide the id field, elasticsearch will insert the document and generate an id
   ``` clojure
   (es-doc/create-doc c
                      "test-index"
@@ -103,6 +103,46 @@ It's currently compatible with Elasticsearch 7.X
     :_seq_no 0,
     :_primary_term 1}
   ```
+  Using the field `id` as document id is the default behavior. However you can provide a mk-id function that takes the created document as parameter to override that behavior and build the id from the document. For instance you could simply provide another field name.
+  ``` clojure
+  (es-doc/create-doc c
+                     "test-index"
+                     {:uri "http://cisco.com/sighting/1"
+                      :name "Jane Doe 2"
+                      :description "yet another anonymous coward"}
+                     {:refresh "wait_for"
+                     :mk-id :uri})
+  ```
+  ``` javascript
+   {:_index "test-index",
+    :_type "_doc",
+    :_id "http://cisco.com/sighting/1",
+    :_version 1,
+    :result "created",
+    :_shards {:total 2, :successful 1, :failed 0},
+    :_seq_no 0,
+    :_primary_term 1}
+  ```
+  another example with a function that return the hash of the created document
+  ``` clojure
+  (es-doc/create-doc c
+                     "test-index"
+                     {:name "Jane Doe 2"
+                      :description "yet another anonymous coward"}
+                     {:refresh "wait_for"
+                     :mk-id hash})
+  ```
+  ``` javascript
+   {:_index "test-index",
+    :_type "_doc",
+    :_id "1474268975",
+    :_version 1,
+    :result "created",
+    :_shards {:total 2, :successful 1, :failed 0},
+    :_seq_no 0,
+    :_primary_term 1}
+  ``` 
+  
   you can similarly create a document with index-doc, but if the document already exists it will erase it
   ``` clojure
   (es-doc/index-doc c

@@ -5,9 +5,14 @@
              [conn :as es-conn]
              [index :as es-index]
              [query :as query]]
+            [ring.util.codec :refer [form-decode]]
+            [clojure.walk :refer [keywordize-keys]]
+            [cheshire.core :as json]
             [schema.test :refer [validate-schemas]]
             [clj-http.fake :refer [with-fake-routes-in-isolation]]
-            [clojure.test :refer [deftest is testing use-fixtures]]))
+            [clojure.test :refer [deftest is testing use-fixtures]]
+            [clojure.string :as string]
+            [ductile.conn :as conn]))
 
 (use-fixtures :once validate-schemas)
 
@@ -500,3 +505,73 @@
                                           :refresh "true"})))
         "delete-by-query with wait-for-completion? set to false should directly return an answer before deletion with a task id")
     (es-index/delete! conn "test_index")))
+
+
+(deftest query-params-test
+  (let [conn (es-conn/connect {:host "localhost" :port 9200})
+        query-params (atom nil)
+        check-query-params (fn [expected msg]
+                             (is (= @query-params expected)
+                                 msg)
+                             (reset! query-params nil))]
+    (with-fake-routes-in-isolation
+      {#"http://localhost:9200/.*"
+       (fn [{:keys [query-string]}]
+         (reset! query-params
+                 (keywordize-keys (form-decode query-string)))
+         {:status 200
+          :headers {:content-type "application/clojure"}})}
+
+      (testing "update query parameter"
+        (sut/update-doc conn "test_index" "1" {:foo "bar"} {})
+        (check-query-params {:_source "true"
+                             :retry_on_conflict "5"}
+                            "default opts should be properly set in update-doc")
+        (sut/update-doc conn
+                        "test_index"
+                        "1"
+                        {:foo "bar"}
+                        {:refresh "wait_for"
+                         :_source ["foo" "label"]
+                         :retry_on_conflict 2
+                         :to-be-ignored "ignored"})
+        (check-query-params {:_source ["foo" "label"]
+                             :retry_on_conflict "2"
+                             :refresh "wait_for"}
+                            "accepted query-params options are `_source`, `refresh`, and `retry_on_conflict`"))
+      (testing "get-doc query parameters"
+        (sut/get-doc conn "test_index" "1" {})
+        (check-query-params ""
+                            "no default query-params")
+        (sut/get-doc conn "test_index" "1" {:_source ["foo" "bar"]
+                                            :to-be-ignored "ignored"})
+        (check-query-params {:_source ["foo" "bar"]}
+                            "only `_source` is accepted as query-parmas"))
+      (testing "create-doc query parameters"
+        (sut/create-doc conn "test_index" {:a "doc"} {})
+        (check-query-params {:op_type "create"}
+                            "create-doc should set `op_type` to force error when document exists")
+        (sut/create-doc conn "test_index" {:a "doc"} {:refresh "wait_for"
+                                                      :to-be-ignored "ignored"})
+        (check-query-params {:op_type "create"
+                             :refresh "wait_for"}
+                            "`refresh` is the only accepted query parameter"))
+      (testing "index-doc query parameters"
+        (sut/index-doc conn "test_index" {:a "doc"} {})
+        (check-query-params "" "index-doc has no default query parameter")
+        (sut/index-doc conn
+                       "test_index"
+                       {:a "doc"}
+                       {:op_type "index"
+                        :refresh "true"
+                        :to-be-ignored "ignored"})
+        (check-query-params {:op_type "index"
+                             :refresh "true"}
+                            "accepted query parameter are `refresh` and `op_type"))
+      (testing "delete-doc query parameters"
+        (sut/delete-doc conn "test_index" "1" {})
+        (check-query-params "" "delete-doc has no default query parameter")
+        (sut/delete-doc conn "test_index" "1" {:refresh "wait_for"
+                                               :to-be-ignored "ignored"})
+        (check-query-params {:refresh "wait_for"}
+                            "`refresh` is the only accepted query parameter")))))
