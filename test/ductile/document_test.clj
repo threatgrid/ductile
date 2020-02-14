@@ -1,18 +1,14 @@
 (ns ductile.document-test
-  (:import clojure.lang.ExceptionInfo)
-  (:require [ductile
-             [document :as sut]
-             [conn :as es-conn]
-             [index :as es-index]
-             [query :as query]]
-            [ring.util.codec :refer [form-decode]]
-            [clojure.walk :refer [keywordize-keys]]
-            [cheshire.core :as json]
-            [schema.test :refer [validate-schemas]]
-            [clj-http.fake :refer [with-fake-routes-in-isolation]]
+  (:require [clj-http.fake :refer [with-fake-routes-in-isolation]]
             [clojure.test :refer [deftest is testing use-fixtures]]
-            [clojure.string :as string]
-            [ductile.conn :as conn]))
+            [clojure.walk :refer [keywordize-keys]]
+            [ductile.conn :as es-conn]
+            [ductile.document :as sut]
+            [ductile.index :as es-index]
+            [ductile.query :as query]
+            [ring.util.codec :refer [form-decode]]
+            [schema.test :refer [validate-schemas]])
+  (:import clojure.lang.ExceptionInfo))
 
 (use-fixtures :once validate-schemas)
 

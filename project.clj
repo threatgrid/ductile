@@ -31,5 +31,6 @@
                    [[ch.qos.logback/logback-classic "1.2.3"]]
                    :resource-paths ["test/resources"]}
              :test {:dependencies
-                    [[clj-http-fake "1.0.3"]]}}
+                    [[clj-http-fake "1.0.3"]
+                     [ring/ring-codec "1.1.2"]]}}
   :global-vars {*warn-on-reflection* true})

@@ -4,11 +4,10 @@
             [clj-http.client :as client]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
-            [ductile
-             [conn :as conn]
-             [pagination :as pagination]
-             [query :as q]
-             [schemas :refer [CRUDOptions ESAggs ESConn ESQuery]]]
+            [ductile.conn :as conn]
+            [ductile.pagination :as pagination]
+            [ductile.query :as q]
+            [ductile.schemas :refer [CRUDOptions ESAggs ESConn ESQuery]]
             [schema.core :as s]))
 
 (def default-limit 1000)
