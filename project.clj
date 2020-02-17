@@ -22,6 +22,7 @@
                                         ;which is provided by `riemann-clojure-client`.
                                com.aphyr/riemann-java-client]]
                  [clout "2.2.1"]]
+  :pedantic? :abort
   :main nil
   :codox {:output-path "doc"
           :source-paths ["src"]}
