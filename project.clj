@@ -19,7 +19,8 @@
             [lein-pprint "1.3.2"]
             ]
   :target-path "target/%s"
-  :profiles {:uberjar {:aot :all}
+  :profiles {:uberjar {:aot :all
+                       :pedantic? :abort}
              :dev {:dependencies
                    [[ch.qos.logback/logback-classic "1.2.3"]]
                    :pedantic? :warn}
