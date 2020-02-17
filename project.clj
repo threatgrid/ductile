@@ -12,11 +12,12 @@
                  [clj-http "3.10.0"] ;TODO bump clj-http with https://github.com/dakrone/clj-http/pull/532
                  [com.arohner/uri "0.1.2"]
                  [cheshire "5.9.0"]]
-  :pedantic? :abort
   :main nil
   :codox {:output-path "doc"
           :source-paths ["src"]}
-  :plugins [[lein-codox "0.10.7"]]
+  :plugins [[lein-codox "0.10.7"]
+            [lein-pprint "1.3.2"]
+            ]
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}
              :dev {:dependencies
@@ -25,5 +26,6 @@
              :test {:dependencies
                     [[clj-http-fake "1.0.3"]
                      [ring/ring-codec "1.1.2"]]
-                    :resource-paths ["test/resources"]}}
+                    :resource-paths ["test/resources"]
+                    :pedantic? :abort}}
   :global-vars {*warn-on-reflection* true})
