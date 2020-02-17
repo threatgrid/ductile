@@ -11,8 +11,12 @@ It's currently compatible with Elasticsearch 7.X
 ```clojure
 (require '[ductile.conn :as es-conn])
 
-(def c (es-conn/connect {:host "localhost" :port 9200}))
+(def c (es-conn/connect {:host "localhost"
+                         :port 9200
+                         :protocol :http
+                         :timeout 20000}))
 ```
+Only `host` and `port` are required, the default protocol value is `:http` and the default timeout is 30000 ms.
 
 * index operations
 ```clojure

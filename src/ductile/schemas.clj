@@ -9,7 +9,7 @@
   (st/open-schema
    {:host s/Str
     :port s/Int
-    (s/optional-key :transport) (s/enum :http :https)
+    (s/optional-key :protocol) (s/enum :http :https)
     (s/optional-key :timeout) s/Int}))
 
 (s/defschema ESConn

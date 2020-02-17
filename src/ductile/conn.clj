@@ -36,13 +36,13 @@
 
 (s/defn connect :- ESConn
   "instantiate an ES conn from props"
-  [{:keys [transport host port timeout]
-    :or {transport :http
+  [{:keys [protocol host port timeout]
+    :or {protocol :http
          timeout default-timeout}} :- ConnectParams]
 
   {:cm (make-connection-manager
         (cm-options {:timeout timeout}))
-   :uri (format "%s://%s:%s" (name transport) host port)})
+   :uri (format "%s://%s:%s" (name protocol) host port)})
 
 (defn safe-es-read [{:keys [status body]
                      :as res}]

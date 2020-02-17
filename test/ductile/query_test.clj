@@ -1,7 +1,9 @@
 (ns ductile.query-test
   (:require [ductile.query :as sut]
-            [clojure.test :refer [deftest is]]))
+            [schema.test :refer [validate-schemas]]
+            [clojure.test :refer [deftest is use-fixtures]]))
 
+(use-fixtures :once validate-schemas)
 
 (deftest prepare-terms
   (let [simple-keys {:a 1 :b [2 3]}

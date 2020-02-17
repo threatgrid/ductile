@@ -1,10 +1,13 @@
 (ns ductile.conn-test
-  (:require [clojure.test :refer [deftest is]]
-            [ductile.conn :as sut]))
+  (:require [clojure.test :refer [deftest is use-fixtures]]
+            [ductile.conn :as sut]
+            [schema.test :refer [validate-schemas]]))
+
+(use-fixtures :once validate-schemas)
 
 (deftest connect-test
   (is (= "https://cisco.com:9201"
-         (:uri (sut/connect {:transport :https
+         (:uri (sut/connect {:protocol :https
                              :host "cisco.com"
                              :port 9201}))))
   (is (= "http://127.0.0.1:9200"
