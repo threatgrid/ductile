@@ -1,7 +1,7 @@
 (def clj-version "1.10.1")
 (def metrics-clojure-version "2.10.0")
 
-(defproject ductile "0.1.0-SNAPSHOT"
+(defproject threatgrid/ductile "0.1.0-SNAPSHOT"
   :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
@@ -25,12 +25,13 @@
   :main nil
   :codox {:output-path "doc"
           :source-paths ["src"]}
+  :plugins [[lein-codox "0.10.7"]]
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}
              :dev {:dependencies
-                   [[ch.qos.logback/logback-classic "1.2.3"]]
-                   :resource-paths ["test/resources"]}
+                   [[ch.qos.logback/logback-classic "1.2.3"]]}
              :test {:dependencies
                     [[clj-http-fake "1.0.3"]
-                     [ring/ring-codec "1.1.2"]]}}
+                     [ring/ring-codec "1.1.2"]]
+                    :resource-paths ["test/resources"]}}
   :global-vars {*warn-on-reflection* true})

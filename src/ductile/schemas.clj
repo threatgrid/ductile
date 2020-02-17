@@ -34,31 +34,13 @@
      :mk-id (s/=> s/Any s/Any)
      :op_type (s/enum "create" "index")})))
 
-(s/defschema ESSlicing
-  {:strategy s/Keyword
-   :granularity s/Keyword})
-
 (s/defschema ESConnState
   "a Store ESConnState shall contain an ESConn
    and all store properties"
   {:index s/Str
    :props {s/Any s/Any}
    :config {s/Any s/Any}
-   :conn ESConn
-   (s/optional-key :slicing) ESSlicing})
-
-(s/defschema DateRangeFilter
-  "a Date range filter for a filtered alias"
-  {:range
-   {:timestamp {:gte s/Str
-                :lt s/Str}}})
-
-(s/defschema SliceProperties
-  "Slice configuration properties"
-  {:name s/Str
-   :granularity s/Keyword
-   :strategy s/Keyword
-   (s/optional-key :filter) DateRangeFilter})
+   :conn ESConn})
 
 
 (s/defschema ESQuery {s/Keyword {s/Any s/Any}})
