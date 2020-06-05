@@ -1,7 +1,7 @@
 language: clojure
 lein: 2.9.1
 dist: trusty
-script: lein do clean, javac, test :all, doo phantom test once
+script: lein do clean, javac, test :all
 
 
 # Cache our Maven deps to be kind to clojars, github, docker images
@@ -28,7 +28,7 @@ before_install:
     - chmod +x $COMPOSE_BIN 
 
 before_script:
-    - $COMPOSE_BIN -f containers/es5/docker-compose.yml up -d > $COMPOSE_LOG
+    - $COMPOSE_BIN -f containers/es7/docker-compose.yml up -d > $COMPOSE_LOG
     # Wait ES
     - until curl http://127.0.0.1:9200/; do sleep 1; done
 

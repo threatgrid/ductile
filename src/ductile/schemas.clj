@@ -9,7 +9,7 @@
   (st/open-schema
    {:host s/Str
     :port s/Int
-    (s/optional-key :transport) (s/enum :http :https)
+    (s/optional-key :protocol) (s/enum :http :https)
     (s/optional-key :timeout) s/Int}))
 
 (s/defschema ESConn
@@ -24,9 +24,15 @@
    https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-refresh.html"
   (s/enum "true" "false" "wait_for"))
 
-(s/defschema ESSlicing
-  {:strategy s/Keyword
-   :granularity s/Keyword})
+(s/defschema CRUDOptions
+  (st/open-schema
+   (st/optional-keys
+    {:refresh Refresh
+     :retry_on_conflict s/Int
+     :wait_for_completion s/Bool
+     :_source (s/cond-pre s/Bool [s/Str])
+     :mk-id (s/=> s/Any s/Any)
+     :op_type (s/enum "create" "index")})))
 
 (s/defschema ESConnState
   "a Store ESConnState shall contain an ESConn
@@ -34,21 +40,7 @@
   {:index s/Str
    :props {s/Any s/Any}
    :config {s/Any s/Any}
-   :conn ESConn
-   (s/optional-key :slicing) ESSlicing})
-
-(s/defschema DateRangeFilter
-  "a Date range filter for a filtered alias"
-  {:range
-   {:timestamp {:gte s/Str
-                :lt s/Str}}})
-
-(s/defschema SliceProperties
-  "Slice configuration properties"
-  {:name s/Str
-   :granularity s/Keyword
-   :strategy s/Keyword
-   (s/optional-key :filter) DateRangeFilter})
+   :conn ESConn})
 
 
 (s/defschema ESQuery {s/Keyword {s/Any s/Any}})

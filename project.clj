@@ -1,7 +1,6 @@
 (def clj-version "1.10.1")
-(def metrics-clojure-version "2.10.0")
 
-(defproject ductile "0.1.0-SNAPSHOT"
+(defproject threatgrid/ductile "0.1.0-SNAPSHOT"
   :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
@@ -12,22 +11,22 @@
                  [metosin/schema-tools "0.12.2"]
                  [clj-http "3.10.0"] ;TODO bump clj-http with https://github.com/dakrone/clj-http/pull/532
                  [com.arohner/uri "0.1.2"]
-                 [cheshire "5.9.0"]
-                 [riemann-clojure-client "0.5.1"]
-                 [metrics-clojure ~metrics-clojure-version]
-                 [metrics-clojure-jvm ~metrics-clojure-version]
-                 [metrics-clojure-ring ~metrics-clojure-version]
-                 [metrics-clojure-riemann ~metrics-clojure-version
-                  :exclusions [;renamed to (and incompatible with) `io.riemann/riemann-java-client`,
-                                        ;which is provided by `riemann-clojure-client`.
-                               com.aphyr/riemann-java-client]]
-                 [clout "2.2.1"]]
+                 [cheshire "5.9.0"]]
   :main nil
   :codox {:output-path "doc"
           :source-paths ["src"]}
+  :plugins [[lein-codox "0.10.7"]
+            [lein-pprint "1.3.2"]
+            ]
   :target-path "target/%s"
-  :profiles {:uberjar {:aot :all}
+  :profiles {:uberjar {:aot :all
+                       :pedantic? :abort}
              :dev {:dependencies
                    [[ch.qos.logback/logback-classic "1.2.3"]]
-                   :resource-paths ["test/resources"]}}
+                   :pedantic? :warn}
+             :test {:dependencies
+                    [[clj-http-fake "1.0.3"]
+                     [ring/ring-codec "1.1.2"]]
+                    :resource-paths ["test/resources"]
+                    :pedantic? :abort}}
   :global-vars {*warn-on-reflection* true})

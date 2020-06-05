@@ -1,0 +1,8 @@
+elasticsearch-dev:
+  image: elasticsearch:7.5.2
+  environment:
+    - cluster.name=elasticsearch
+    - discovery.type=single-node
+  ports:
+    - "9200:9200"
+    - "9300:9300"
