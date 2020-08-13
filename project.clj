@@ -7,17 +7,18 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure ~clj-version]
                  [org.clojure/tools.logging "0.5.0"]
+                 [org.clojure/tools.namespace "1.0.0"]
                  [prismatic/schema "1.1.12"]
                  [metosin/schema-tools "0.12.2"]
-                 [clj-http "3.10.0"] ;TODO bump clj-http with https://github.com/dakrone/clj-http/pull/532
+                 [clj-http "3.10.1"]
                  [com.arohner/uri "0.1.2"]
                  [cheshire "5.9.0"]]
+  :repositories [["sonatype-snapshots" {:url "https://oss.sonatype.org/content/repositories/snapshots/"}]]
   :main nil
   :codox {:output-path "doc"
           :source-paths ["src"]}
   :plugins [[lein-codox "0.10.7"]
-            [lein-pprint "1.3.2"]
-            ]
+            [lein-pprint "1.3.2"]]
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all
                        :pedantic? :abort}

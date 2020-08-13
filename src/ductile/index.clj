@@ -73,6 +73,16 @@
    (client/put (str (index-uri uri index-name) "/_settings")
                (make-http-opts cm {} [] settings nil))))
 
+(s/defn update-mappings!
+  "Update an ES index mapping. takes a mappings map
+  from type names to mapping types."
+  [{:keys [uri cm] :as conn} :- ESConn
+   index-name :- s/Str
+   mappings :- {:properties {s/Any s/Any}}]
+  (safe-es-read
+   (client/put (str (index-uri uri index-name) "/_mapping")
+               (make-http-opts cm {} [] mappings nil))))
+
 (s/defn get
   "get an index"
   [{:keys [uri cm]} :- ESConn
