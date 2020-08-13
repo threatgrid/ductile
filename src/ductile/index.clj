@@ -75,7 +75,7 @@
 
 (s/defn update-mappings!
   "Update an ES index mapping. takes a mappings map
-  from type names to mapping types."
+  from field names to mapping types."
   [{:keys [uri cm] :as conn} :- ESConn
    index-name :- s/Str
    mappings :- {:properties {s/Any s/Any}}]
