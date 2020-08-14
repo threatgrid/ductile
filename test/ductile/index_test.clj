@@ -46,10 +46,25 @@
     (let [conn (es-conn/connect {:host "localhost" :port 9200})]
 
       (testing "all ES Index CRUD operations"
-        (let [index-create-res
-              (sut/create! conn "test_index"
-                                {:settings {:number_of_shards 1
-                                            :number_of_replicas 1}})
+        (let [base-mappings {:properties {:name {:type "text"}
+                                          :age {:type "integer"}}}
+              base-settings {:number_of_shards "1"
+                             :number_of_replicas "1"}
+              index-create-res
+              (sut/create! conn
+                           "test_index"
+                           {:mappings base-mappings
+                            :settings base-settings})
+              updated-mappings (assoc-in base-mappings
+                                        [:properties :email :type]
+                                        "keyword")
+              index-update-mappings-res (sut/update-mappings! conn
+                                                              "test_index"
+                                                              updated-mappings)
+              updated-settings (assoc base-settings :number_of_replicas "2")
+              index-update-settings-res (sut/update-settings! conn
+                                                              "test_index"
+                                                              {:number_of_replicas 2})
               index-get-res (sut/get conn "test_index")
               index-close-res (sut/close! conn "test_index")
               index-open-res (sut/open! conn "test_index")
@@ -58,13 +73,10 @@
           (is (true? (boolean index-create-res)))
           (is (= {:test_index
                   {:aliases {}
-                   :mappings {}
+                   :mappings updated-mappings
                    :settings
-                   {:index
-                    {:number_of_shards "1"
-                     :number_of_replicas "1"
-                     :provided_name "test_index"}}}}
-
+                   {:index (assoc updated-settings
+                                  :provided_name "test_index")}}}
                  (update-in index-get-res
                             [:test_index :settings :index]
                             dissoc
