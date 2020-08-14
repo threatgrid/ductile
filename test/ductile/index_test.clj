@@ -195,6 +195,7 @@
             :search_routing "kimchy"}
            (:alias2 aliases)))
     (is (= 2 (count aliases)))
+    (is (= index_patterns ["pattern1" "pattern2"]))
     (is (= {:acknowledged true}
            (sut/create-template! conn
                                  template-name-2

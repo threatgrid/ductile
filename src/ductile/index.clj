@@ -78,7 +78,7 @@
   from field names to mapping types."
   [{:keys [uri cm] :as conn} :- ESConn
    index-name :- s/Str
-   mappings :- {:properties {s/Any s/Any}}]
+   mappings :- {:properties (s/pred map?)}]
   (safe-es-read
    (client/put (str (index-uri uri index-name) "/_mapping")
                (make-http-opts cm {} [] mappings nil))))
