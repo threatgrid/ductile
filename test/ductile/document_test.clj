@@ -85,12 +85,12 @@
           :search_after ["value1"]
           :sort {"field1" {:order :asc}}}
          (sut/params->pagination {:sort_by :field1
-                                     :offset 1000
-                                     :limit 10000
-                                     :search_after ["value1"]})
+                                  :offset 1000
+                                  :limit 10000
+                                  :search_after ["value1"]})
          (sut/params->pagination {:sort_by :field1
-                                     :limit 10000
-                                     :search_after ["value1"]}))))
+                                  :limit 10000
+                                  :search_after ["value1"]}))))
 
 (deftest generate-search-params-test
   (is (= {:size 10 :from 20}
@@ -571,3 +571,29 @@
                                                :to-be-ignored "ignored"})
         (check-query-params {:refresh "wait_for"}
                             "`refresh` is the only accepted query parameter")))))
+
+(deftest pagination-params-test
+  (testing "pagination parameters must be properly extracted from result query and query parameter"
+    (let [pagination-params #'sut/pagination-params
+          es-params {:from 20
+                     :size 10
+                     :search_after ["id-20"]}
+          hits (map #(let [title (str "title 2" %)
+                           id (str "id-2" %)]
+                       {:_source {:title title
+                                  :id id}
+                        :sort [id]})
+                    (range 10))
+          es5-result {:hits {:total 10
+                             :hits hits}}
+          es7-result {:hits {:total {:value 10}
+                             :hits hits}}]
+    (is (= {:offset 20
+            :limit 10
+            :sort ["id-29"]
+            :search_after ["id-20"]
+            :total-hits 10}
+           (pagination-params es5-result
+                                  es-params)
+           (pagination-params es7-result
+                                  es-params))))))

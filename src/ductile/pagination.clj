@@ -19,7 +19,7 @@
            limit
            sort
            search_after
-           hits]}]
+           total-hits]}]
   (let [offset (or offset 0)
         limit (or limit default-limit)
         previous-offset (- offset limit)
@@ -29,7 +29,7 @@
                        (> max-result-window (+ offset limit)))
         next? (if search_after
                 (= limit (count results))
-                (> hits next-offset))
+                (> total-hits next-offset))
         previous {:previous {:limit limit
                              :offset (if (> previous-offset 0)
                                        previous-offset 0)}}
@@ -40,7 +40,7 @@
                 sort (assoc :search_after sort))}]
     {:data results
      :paging (merge
-              {:total-hits hits}
+              {:total-hits total-hits}
               (when previous? previous)
               (when next? next)
               (when sort {:sort sort}))}))

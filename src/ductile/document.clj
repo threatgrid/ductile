@@ -160,7 +160,7 @@
                        ops-with-size)]
     (reverse (map second groups))))
 
-(defn- bulk-post-docs
+(defn ^:private bulk-post-docs
   [json-ops
    {:keys [uri cm] :as _conn}
    opts]
@@ -306,21 +306,23 @@
     index-name :- s/Str]
    (count-docs es-conn index-name nil)))
 
-(defn- result-data
+(defn ^:private result-data
   [res full-hits?]
   (cond->> (-> res :hits :hits)
     (not full-hits?) (map :_source)))
 
-(defn- pagination-params
+(defn ^:private pagination-params
   [{:keys [hits]}
    {:keys [from size search_after]}]
   {:offset from
    :limit size
    :sort (-> hits :hits last :sort)
    :search_after search_after
-   :hits (get-in hits [:total :value] 0)})
+   :total-hits (or (get-in hits [:total :value])
+                   (:total hits) ;; compatibility with 5.x
+                   0)})
 
-(defn- format-result
+(defn ^:private format-result
   [{:keys [aggregations] :as res}
    es-params
    full-hits?]
