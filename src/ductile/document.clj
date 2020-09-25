@@ -91,7 +91,7 @@
 
 (s/defn get-doc
   "get a document on es and return only the source"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri cm version]} :- ESConn
    index-name :- s/Str
    id
    opts :- CRUDOptions]

@@ -17,7 +17,8 @@
    connection manager and an index name"
   {:cm (s/either PoolingClientConnectionManager
                  PoolingHttpClientConnectionManager)
-   :uri s/Str})
+   :uri s/Str
+   (s/optional-key :version) s/Int})
 
 (s/defschema Refresh
   "ES refresh parameter, see
