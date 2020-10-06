@@ -4,5 +4,5 @@ elasticsearch-dev:
     - cluster.name=elasticsearch
     - discovery.type=single-node
   ports:
-    - "9200:9200"
-    - "9300:9300"
+    - "9207:9200"
+    - "9307:9300"

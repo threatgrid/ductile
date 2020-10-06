@@ -10,6 +10,7 @@
    {:host s/Str
     :port s/Int
     (s/optional-key :protocol) (s/enum :http :https)
+    (s/optional-key :version) s/Int
     (s/optional-key :timeout) s/Int}))
 
 (s/defschema ESConn

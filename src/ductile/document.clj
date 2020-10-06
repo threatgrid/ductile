@@ -15,11 +15,11 @@
 
 (defn index-doc-uri
   "make an uri for document index"
-  [uri index-name id]
-  (str (uri/uri uri
-                (uri/uri-encode index-name)
-                "_doc"
-                (uri/uri-encode id))))
+  ([uri index-name doc-type id]
+   (str (uri/uri uri
+                 (uri/uri-encode index-name)
+                 (or (not-empty doc-type) "_doc")
+                 (uri/uri-encode id)))))
 
 (def delete-doc-uri
   "make an uri for doc deletion"
@@ -31,14 +31,15 @@
 
 (defn update-doc-uri
   "make an uri for document update"
-  [uri
-   index-name
-   id]
-  (str
-   (uri/uri uri
-            (uri/uri-encode index-name)
-            "_update"
-            (uri/uri-encode id))))
+  ([uri index-name id]
+   (str
+    (uri/uri uri
+             (uri/uri-encode index-name)
+             "_update"
+             (uri/uri-encode id))))
+  ([uri index-name id doc-type]
+   (-> (index-doc-uri uri index-name id doc-type)
+       (str "/_update"))))
 
 (defn bulk-uri
   "make an uri for bulk action"
@@ -64,6 +65,7 @@
   "all operations fields for a bulk operation"
   [:_doc_as_upsert
    :_index
+   :_type
    :_id
    :_retry_on_conflict
    :_routing
@@ -91,47 +93,69 @@
 
 (s/defn get-doc
   "get a document on es and return only the source"
-  [{:keys [uri cm version]} :- ESConn
-   index-name :- s/Str
-   id
-   opts :- CRUDOptions]
-  (-> (client/get (get-doc-uri uri
-                               index-name
-                               id)
-                  (conn/make-http-opts cm opts [:_source]))
-      conn/safe-es-read
-      :_source))
+  ([{:keys [uri cm] :as conn} :- ESConn
+    index-name :- s/Str
+    type-name :- (s/maybe s/Str)
+    id :- s/Str
+    opts :- CRUDOptions]
+   (-> (get-doc-uri uri index-name type-name id)
+       (client/get (conn/make-http-opts cm opts [:_source]))
+       conn/safe-es-read
+       :_source))
+  ([conn :- ESConn
+    index-name :- s/Str
+    id :- s/Str
+    opts :- CRUDOptions]
+   (get-doc conn index-name nil id opts)))
 
-(s/defn index-doc-internal
+(s/defn ^:private index-doc-internal
   [{:keys [uri cm]} :- ESConn
    index-name :- s/Str
+   doc-type :- (s/maybe s/Str)
    doc :- s/Any
    {:keys [mk-id]
     :or {mk-id :id}
     :as opts} :- CRUDOptions]
-  (conn/safe-es-read
-   (client/post (index-doc-uri uri index-name (mk-id doc))
-                (conn/make-http-opts cm opts [:refresh :op_type] doc nil))))
+  (let [doc-id (mk-id doc)
+        valid-opts (cond-> [:refresh]
+                     ;; es5 does not allow op_type=create when no id is provided
+                     ;; https://github.com/elastic/elasticsearch/issues/21535#issuecomment-260467699
+                     doc-id (conj :op_type))]
+    (conn/safe-es-read
+     (client/post (index-doc-uri uri index-name doc-type doc-id)
+                  (conn/make-http-opts cm opts valid-opts doc nil)))))
 
 (s/defn index-doc
   "index a document on es return the indexed document"
   ([es-conn :- ESConn
     index-name :- s/Str
+    doc-type :- (s/maybe s/Str)
     doc :- s/Any
     opts :- CRUDOptions]
-   (index-doc-internal es-conn index-name doc opts))
-  ([es-conn index-name doc] (index-doc-internal es-conn index-name doc {})))
+   (index-doc-internal es-conn index-name doc-type doc opts))
+  ([es-conn :- ESConn
+    index-name :- s/Str
+    doc :- s/Any
+    opts :- CRUDOptions]
+   (index-doc-internal es-conn index-name nil doc opts)))
 
 (s/defn create-doc
   "create a document on es return the created document"
-  [es-conn :- ESConn
-   index-name :- s/Str
-   doc :- s/Any
-   opts :- CRUDOptions]
-  (index-doc-internal es-conn
-                      index-name
-                      doc
-                      (assoc opts :op_type "create")))
+  ([es-conn :- ESConn
+    index-name :- s/Str
+    doc :- s/Any
+    opts :- CRUDOptions]
+   (create-doc es-conn index-name nil doc opts))
+  ([es-conn :- ESConn
+    index-name :- s/Str
+    doc-type :- (s/maybe s/Str)
+    doc :- s/Any
+    opts :- CRUDOptions]
+   (index-doc-internal es-conn
+                       index-name
+                       doc-type
+                       doc
+                       (assoc opts :op_type "create"))))
 
 (defn byte-size
   "Count the size of the given string in bytes."
@@ -199,15 +223,10 @@
        (bulk-post-docs json-ops-group conn opts))
      docs)))
 
-(s/defn update-doc
-  "update a document on es return the updated document"
-  [{:keys [uri cm]} :- ESConn
-   index-name :- s/Str
-   id :- s/Str
-   doc :- s/Any
-   opts :- CRUDOptions]
+(defn ^:private update-doc-raw
+  [uri cm doc opts]
   (-> (client/post
-       (update-doc-uri uri index-name id)
+       uri
        (conn/make-http-opts cm
                             (into {:_source true
                                    :retry_on_conflict default-retry-on-conflict}
@@ -217,6 +236,24 @@
                             nil))
       conn/safe-es-read
       (get-in [:get :_source])))
+
+(s/defn update-doc
+  "update a document on es return the updated document"
+  ([{:keys [uri cm]} :- ESConn
+    index-name :- s/Str
+    doc-type :- (s/maybe s/Str)
+    id :- s/Str
+    doc :- s/Any
+    opts :- CRUDOptions]
+   (-> (update-doc-uri uri index-name doc-type id)
+       (update-doc-raw cm doc opts)))
+  ([{:keys [uri cm]} :- ESConn
+    index-name :- s/Str
+    id :- s/Str
+    doc :- s/Any
+    opts :- CRUDOptions]
+   (-> (update-doc-uri uri index-name id)
+       (update-doc-raw cm doc opts))))
 
 (s/defn delete-doc
   "delete a document on es, returns boolean"

@@ -2,6 +2,7 @@
   (:require [clj-http.conn-mgr :refer [make-reusable-conn-manager]]
             [clojure.tools.logging :as log]
             [ductile.schemas :refer [ConnectParams ESConn]]
+            [medley.core :refer [assoc-some]]
             [schema.core :as s]))
 
 (def default-timeout 30000)
@@ -36,13 +37,14 @@
 
 (s/defn connect :- ESConn
   "instantiate an ES conn from props"
-  [{:keys [protocol host port timeout]
+  [{:keys [protocol host port timeout version]
     :or {protocol :http
          timeout default-timeout}} :- ConnectParams]
-
-  {:cm (make-connection-manager
-        (cm-options {:timeout timeout}))
-   :uri (format "%s://%s:%s" (name protocol) host port)})
+  (assoc-some
+   {:cm (make-connection-manager
+         (cm-options {:timeout timeout}))
+    :uri (format "%s://%s:%s" (name protocol) host port)}
+    :version version))
 
 (defn safe-es-read [{:keys [status body]
                      :as res}]

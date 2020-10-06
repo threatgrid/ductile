@@ -1,7 +1,7 @@
 elasticsearch-dev:
   image: elasticsearch:5.6.9
   environment:
-    - cluster.name=elasticsearch
+    - cluster.name=elasticsearch5
   ports:
-    - "9200:9200"
-    - "9300:9300"
+    - "9205:9200"
+    - "9305:9300"
