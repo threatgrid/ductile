@@ -1,6 +1,7 @@
 (ns ductile.index-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [ductile
+             [test-helpers :refer [for-each-es-version]]
              [index :as sut]
              [conn :as es-conn]
              [document :as es-doc]]
@@ -41,57 +42,60 @@
            "http://127.0.0.1/_refresh"))))
 
 (deftest ^:integration index-crud-ops
-  (testing "with ES conn test setup"
+  (for-each-es-version
+   "all ES Index CRUD operations"
+   (sut/delete! conn "test_index")
+   (let [doc-type (when (= 5 version) :sighting)
+         base-mappings (cond->> {:properties {:name {:type "text"}
+                                              :age {:type "integer"}}}
+                         (= version 5) (assoc {} doc-type))
+         base-settings {:number_of_shards "1"
+                        :number_of_replicas "1"}
+         index-create-res
+         (sut/create! conn
+                      "test_index"
+                      {:mappings base-mappings
+                       :settings base-settings})
+         updated-mappings (assoc-in base-mappings
+                                    (remove nil? [doc-type :properties :email :type])
+                                    "keyword")
+         index-update-mappings-res (sut/update-mappings! conn
+                                                         "test_index"
+                                                         (some-> doc-type name)
+                                                         updated-mappings)
+         updated-settings (assoc base-settings :number_of_replicas "2")
+         index-update-settings-res (sut/update-settings! conn
+                                                         "test_index"
+                                                         {:number_of_replicas 2})
+         index-get-res (sut/get conn "test_index")
+         index-close-res (sut/close! conn "test_index")
+         index-open-res (sut/open! conn "test_index")
+         index-delete-res (sut/delete! conn "test_index")]
 
-    (let [conn (es-conn/connect {:host "localhost" :port 9200})]
-
-      (testing "all ES Index CRUD operations"
-        (let [base-mappings {:properties {:name {:type "text"}
-                                          :age {:type "integer"}}}
-              base-settings {:number_of_shards "1"
-                             :number_of_replicas "1"}
-              index-create-res
-              (sut/create! conn
-                           "test_index"
-                           {:mappings base-mappings
-                            :settings base-settings})
-              updated-mappings (assoc-in base-mappings
-                                        [:properties :email :type]
-                                        "keyword")
-              index-update-mappings-res (sut/update-mappings! conn
-                                                              "test_index"
-                                                              updated-mappings)
-              updated-settings (assoc base-settings :number_of_replicas "2")
-              index-update-settings-res (sut/update-settings! conn
-                                                              "test_index"
-                                                              {:number_of_replicas 2})
-              index-get-res (sut/get conn "test_index")
-              index-close-res (sut/close! conn "test_index")
-              index-open-res (sut/open! conn "test_index")
-              index-delete-res (sut/delete! conn "test_index")]
-
-          (is (true? (boolean index-create-res)))
-          (is (= {:test_index
-                  {:aliases {}
-                   :mappings updated-mappings
-                   :settings
-                   {:index (assoc updated-settings
-                                  :provided_name "test_index")}}}
-                 (update-in index-get-res
-                            [:test_index :settings :index]
-                            dissoc
-                            :creation_date
-                            :uuid
-                            :version)))
-          (is (= {:acknowledged true :shards_acknowledged true} index-open-res))
-          (is (= {:acknowledged true
-                  :shards_acknowledged true
-                  :indices {:test_index {:closed true}}}
-                 index-close-res))
-          (is (true? (boolean index-delete-res))))))))
+     (is (true? (boolean index-create-res)))
+     (is (= {:test_index
+             {:aliases {}
+              :mappings updated-mappings
+              :settings
+              {:index (assoc updated-settings
+                             :provided_name "test_index")}}}
+            (update-in index-get-res
+                       [:test_index :settings :index]
+                       dissoc
+                       :creation_date
+                       :uuid
+                       :version)))
+     (is (= (cond-> {:acknowledged true}
+              (< 5 version) (assoc :shards_acknowledged true))
+            index-open-res))
+     (is (= (cond-> {:acknowledged true}
+              (< 5 version) (assoc :shards_acknowledged true
+                                   :indices {:test_index {:closed true}}))
+            index-close-res))
+     (is (true? (boolean index-delete-res))))))
 
 (deftest ^:integration rollover-test
-  (let [conn (es-conn/connect {:host "localhost" :port 9200})]
+  (let [conn (es-conn/connect {:host "localhost" :port 9207})]
     (sut/delete! conn "test_index-*")
     (sut/create! conn
                       "test_index-1"
@@ -168,7 +172,7 @@
     (sut/delete! conn "test_index-*")))
 
 (deftest template-test
-  (let [conn (es-conn/connect {:host "localhost" :port 9200})
+  (let [conn (es-conn/connect {:host "localhost" :port 9207})
         template-name-1 "template-1"
         template-name-2 "template-2"
         config {:settings {:number_of_shards "1"

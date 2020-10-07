@@ -76,12 +76,19 @@
 (s/defn update-mappings!
   "Update an ES index mapping. takes a mappings map
   from field names to mapping types."
-  [{:keys [uri cm] :as conn} :- ESConn
-   index-name :- s/Str
-   mappings :- {:properties (s/pred map?)}]
-  (safe-es-read
-   (client/put (str (index-uri uri index-name) "/_mapping")
-               (make-http-opts cm {} [] mappings nil))))
+  ([{:keys [uri cm] :as conn} :- ESConn
+    index-name :- s/Str
+    doc-type :- (s/maybe s/Str)
+    mappings :- (s/pred map?)]
+   (-> (index-uri uri index-name)
+       (uri/uri "_mapping" doc-type)
+       str
+       (client/put (make-http-opts cm {} [] mappings nil))
+       safe-es-read))
+  ([conn :- ESConn
+    index-name :- s/Str
+    mappings :- (s/pred map?)]
+   (update-mappings! conn index-name nil mappings)))
 
 (s/defn get
   "get an index"
@@ -109,11 +116,13 @@
 
 (s/defn create-template!
   "create an index template, update if already exists"
-  ([{:keys [uri cm]} :- ESConn
+  ([{:keys [uri cm version]} :- ESConn
     template-name :- s/Str
     index-config
     index-patterns :- [s/Str]]
-  (let [template (assoc index-config :index_patterns index-patterns)]
+   (let [template (cond-> index-config
+                    (<= 6 version) (assoc :index_patterns index-patterns)
+                    (= 5 version) (assoc :index_pattern (first index-patterns)))]
     (safe-es-read
      (client/put (template-uri uri template-name)
                  (make-http-opts cm {} nil template nil)))))
