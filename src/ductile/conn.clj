@@ -39,7 +39,8 @@
   "instantiate an ES conn from props"
   [{:keys [protocol host port timeout version]
     :or {protocol :http
-         timeout default-timeout}} :- ConnectParams]
+         timeout default-timeout
+         version 7}} :- ConnectParams]
   (assoc-some
    {:cm (make-connection-manager
          (cm-options {:timeout timeout}))

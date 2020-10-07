@@ -257,15 +257,21 @@
 
 (s/defn delete-doc
   "delete a document on es, returns boolean"
-  [{:keys [uri cm]} :- ESConn
-   index-name :- s/Str
-   id :- s/Str
-   opts :- CRUDOptions]
-  (-> (client/delete (delete-doc-uri uri index-name id)
+  ([conn :- ESConn
+    index-name :- s/Str
+    id :- s/Str
+    opts :- CRUDOptions]
+   (delete-doc conn index-name nil id opts))
+  ([{:keys [uri cm]} :- ESConn
+    index-name :- s/Str
+    doc-type :- (s/maybe s/Str)
+    id :- s/Str
+    opts :- CRUDOptions]
+  (-> (client/delete (delete-doc-uri uri index-name doc-type id)
                      (conn/make-http-opts cm opts [:refresh]))
       conn/safe-es-read
       :result
-      (= "deleted")))
+      (= "deleted"))))
 
 (s/defn delete-by-query-uri
   [uri index-names]

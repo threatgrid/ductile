@@ -19,7 +19,7 @@
   {:cm (s/either PoolingClientConnectionManager
                  PoolingHttpClientConnectionManager)
    :uri s/Str
-   (s/optional-key :version) s/Int})
+   :version s/Int})
 
 (s/defschema Refresh
   "ES refresh parameter, see
