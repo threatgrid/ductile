@@ -44,7 +44,7 @@
 (deftest ^:integration index-crud-ops
   (for-each-es-version
    "all ES Index CRUD operations"
-   (sut/delete! conn "test_index")
+   #(sut/delete! conn "test_index")
    (let [doc-type (when (= 5 version) :sighting)
          base-mappings (cond->> {:properties {:name {:type "text"}
                                               :age {:type "integer"}}}
@@ -97,7 +97,7 @@
 (deftest ^:integration rollover-test
   (for-each-es-version
    "rollover should properly trigger _rollover"
-   (sut/delete! conn "test_index-*")
+   #(sut/delete! conn "test_index-*")
    (sut/create! conn
                 "test_index-1"
                 {:settings {:number_of_shards 1
@@ -182,9 +182,9 @@
                             :refresh_interval "2s"}
                  :mappings (cond->> {:_source {:enabled false}}
                              (= version 5) (assoc {} doc-type))
-                             :aliases {:alias1 {}
-                                       :alias2 {:filter {:term {:user "kimchy"}}
-                                                :routing "kimchy"}}}
+                 :aliases {:alias1 {}
+                           :alias2 {:filter {:term {:user "kimchy"}}
+                                    :routing "kimchy"}}}
          _  (is (= {:acknowledged true}
                    (sut/create-template! conn
                                          template-name-1

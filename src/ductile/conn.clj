@@ -1,5 +1,6 @@
 (ns ductile.conn
-  (:require [clj-http.conn-mgr :refer [make-reusable-conn-manager]]
+  (:require [clj-http.conn-mgr :refer [make-reusable-conn-manager
+                                       shutdown-manager]]
             [clojure.tools.logging :as log]
             [ductile.schemas :refer [ConnectParams ESConn]]
             [medley.core :refer [assoc-some]]
@@ -46,6 +47,9 @@
          (cm-options {:timeout timeout}))
     :uri (format "%s://%s:%s" (name protocol) host port)}
     :version version))
+
+(s/defn close [conn :- ESConn]
+  (-> conn :cm shutdown-manager))
 
 (defn safe-es-read [{:keys [status body]
                      :as res}]

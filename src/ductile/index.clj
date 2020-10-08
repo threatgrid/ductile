@@ -121,8 +121,8 @@
     index-config
     index-patterns :- [s/Str]]
    (let [template (cond-> index-config
-                    (<= 6 version) (assoc :index_patterns index-patterns)
-                    (= 5 version) (assoc :template (first index-patterns)))]
+                    (>= version 6) (assoc :index_patterns index-patterns)
+                    (= version 5) (assoc :template (first index-patterns)))]
     (safe-es-read
      (client/put (template-uri uri template-name)
                  (make-http-opts cm {} nil template nil)))))

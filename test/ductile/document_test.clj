@@ -17,19 +17,19 @@
   (testing "should generate a valid _search uri"
     (is (= "http://localhost:9200/ctia_tool/_search"
            (sut/search-uri "http://localhost:9200"
-                              "ctia_tool")))
+                           "ctia_tool")))
     (is (= "http://localhost:9200/_search"
            (sut/search-uri "http://localhost:9200"
-                              nil)))))
+                           nil)))))
 
 (deftest delete-by-query-uri-test
   (testing "should generate a valid delete_by_query uri"
     (is (= "http://localhost:9200/ctim/_delete_by_query"
            (sut/delete-by-query-uri "http://localhost:9200"
-                                       ["ctim"])))
+                                    ["ctim"])))
     (is (= "http://localhost:9200/ctim%2Cctia/_delete_by_query"
            (sut/delete-by-query-uri "http://localhost:9200"
-                                       ["ctim", "ctia"])))))
+                                    ["ctim", "ctia"])))))
 
 (deftest index-doc-uri-test
   (testing "should generate a valid doc URI"
@@ -73,7 +73,7 @@
           :sort {"field1" {:order :desc}}}
          (sut/params->pagination {:sort_by "field1:desc"})
          (sut/params->pagination {:sort_by "field1:desc"
-                                     :sort_order :asc})))
+                                  :sort_order :asc})))
 
   (is (= {:size 100
           :sort {"field1" {:order :desc}
@@ -81,20 +81,20 @@
                  "field3" {:order :desc}}}
          (sut/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"})
          (sut/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"
-                                     :sort_order :asc})))
+                                  :sort_order :asc})))
 
   (is (= {:size 100
           :from 1000
           :sort {"field1" {:order :asc}}}
          (sut/params->pagination {:sort_by :field1
-                                     :offset 1000})))
+                                  :offset 1000})))
 
   (is (= {:size 10000
           :from 1000
           :sort {"field1" {:order :asc}}}
          (sut/params->pagination {:sort_by :field1
-                                     :offset 1000
-                                     :limit 10000})))
+                                  :offset 1000
+                                  :limit 10000})))
 
   (is (= {:size 10000
           :from 0
