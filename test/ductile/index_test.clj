@@ -95,122 +95,129 @@
      (is (true? (boolean index-delete-res))))))
 
 (deftest ^:integration rollover-test
-  (let [conn (es-conn/connect {:host "localhost" :port 9207})]
-    (sut/delete! conn "test_index-*")
-    (sut/create! conn
-                      "test_index-1"
-                      {:settings {:number_of_shards 1
-                                  :number_of_replicas 1}
-                       :aliases {:test_alias {}}})
-    (testing "rollover should not be applied if conditions are not matched"
-      (let [{:keys [rolled_over dry_run new_index]}
-            (sut/rollover! conn "test_alias" {:max_age "1d" :max_docs 3})]
-        (is (false? rolled_over))
-        (is (false? dry_run))
-        (is (false? (sut/index-exists? conn new_index)))))
+  (for-each-es-version
+   "rollover should properly trigger _rollover"
+   (sut/delete! conn "test_index-*")
+   (sut/create! conn
+                "test_index-1"
+                {:settings {:number_of_shards 1
+                            :number_of_replicas 1}
+                 :aliases {:test_alias {}}})
+   (testing "rollover should not be applied if conditions are not matched"
+     (let [{:keys [rolled_over dry_run new_index]}
+           (sut/rollover! conn "test_alias" {:max_age "1d" :max_docs 3})]
+       (is (false? rolled_over))
+       (is (false? dry_run))
+       (is (false? (sut/index-exists? conn new_index)))))
 
-    (is (= {:rolled_over false :dry_run true}
-           (-> (sut/rollover! conn
-                                   "test_alias"
-                                   {:max_age "1d" :max_docs 3}
-                                   {}
-                                   nil
-                                   true)
-               (select-keys [:rolled_over :dry_run])))
-        "rollover dry_run paramater should be properly applied")
+   (is (= {:rolled_over false :dry_run true}
+          (-> (sut/rollover! conn
+                             "test_alias"
+                             {:max_age "1d" :max_docs 3}
+                             {}
+                             nil
+                             true)
+              (select-keys [:rolled_over :dry_run])))
+       "rollover dry_run paramater should be properly applied")
 
-    ;; add 3 documents to trigger max-doc condition
-    (es-doc/bulk-create-doc conn
-                            (repeat 3 {:_index "test_alias"
-                                       :foo :bar})
-                            {:refresh "true"})
+   ;; add 3 documents to trigger max-doc condition
+   (es-doc/bulk-create-doc conn
+                           (repeat 3 (cond-> {:_index "test_alias"
+                                              :foo :bar}
+                                       (= 5 version) (assoc :_type "doc_type")))
+                           {:refresh "true"})
 
-    (testing "rollover dry_run parameter should be properly applied when condition is met"
-      (let [{:keys [rolled_over dry_run old_index new_index]}
-            (sut/rollover! conn
-                                "test_alias"
-                                {:max_age "1d" :max_docs 3}
-                                {}
-                                nil
-                                true)]
-        (is (false? rolled_over))
-        (is dry_run)
-        (is (= old_index "test_index-1"))
-        (is (not= new_index old_index))
-        (is (false? (sut/index-exists? conn new_index)))))
+   (testing "rollover dry_run parameter should be properly applied when condition is met"
+     (let [{:keys [rolled_over dry_run old_index new_index]}
+           (sut/rollover! conn
+                          "test_alias"
+                          {:max_age "1d" :max_docs 3}
+                          {}
+                          nil
+                          true)]
+       (is (false? rolled_over))
+       (is dry_run)
+       (is (= old_index "test_index-1"))
+       (is (not= new_index old_index))
+       (is (false? (sut/index-exists? conn new_index)))))
 
-    (is (= "test_index_new"
-           (:new_index (sut/rollover! conn
-                                           "test_alias"
-                                           {:max_age "1d" :max_docs 3}
-                                           {}
-                                           "test_index_new"
-                                           true)))
-        "new_index should be equal to the name passed as parameter")
+   (is (= "test_index_new"
+          (:new_index (sut/rollover! conn
+                                     "test_alias"
+                                     {:max_age "1d" :max_docs 3}
+                                     {}
+                                     "test_index_new"
+                                     true)))
+       "new_index should be equal to the name passed as parameter")
 
-    (testing "rollover should be properly applied when condition is met and dry run set to false"
-      (let [{:keys [rolled_over dry_run old_index new_index]}
-            (sut/rollover! conn
-                                "test_alias"
-                                {:max_age "1d" :max_docs 3}
-                                {:number_of_shards 2
-                                 :number_of_replicas 3}
-                                nil
-                                false)
-            {:keys [number_of_shards
-                    number_of_replicas]} (get-in (sut/get conn new_index)
-                                                 [(keyword new_index) :settings :index])]
-        (is rolled_over)
-        (is (false? dry_run))
-        (is (= old_index "test_index-1"))
-        (is (not= old_index new_index))
-        (is (sut/index-exists? conn old_index))
-        (is (sut/index-exists? conn new_index))
-        (is (= "2" number_of_shards))
-        (is (= "3" number_of_replicas))))
-
-    (sut/delete! conn "test_index-*")))
+   (testing "rollover should be properly applied when condition is met and dry run set to false"
+     (let [{:keys [rolled_over dry_run old_index new_index]}
+           (sut/rollover! conn
+                          "test_alias"
+                          {:max_age "1d" :max_docs 3}
+                          {:number_of_shards 2
+                           :number_of_replicas 3}
+                          nil
+                          false)
+           {:keys [number_of_shards
+                   number_of_replicas]} (get-in (sut/get conn new_index)
+                                                [(keyword new_index) :settings :index])]
+       (is rolled_over)
+       (is (false? dry_run))
+       (is (= old_index "test_index-1"))
+       (is (not= old_index new_index))
+       (is (sut/index-exists? conn old_index))
+       (is (sut/index-exists? conn new_index))
+       (is (= "2" number_of_shards))
+       (is (= "3" number_of_replicas))))))
 
 (deftest template-test
-  (let [conn (es-conn/connect {:host "localhost" :port 9207})
-        template-name-1 "template-1"
-        template-name-2 "template-2"
-        config {:settings {:number_of_shards "1"
-                           :refresh_interval "2s"}
-                :mappings {:_source {:enabled false}}
-                :aliases {:alias1 {}
-                          :alias2 {:filter {:term {:user "kimchy"}}
-                                   :routing "kimchy"}}}
-        _  (is (= {:acknowledged true}
-                  (sut/create-template! conn
-                                        template-name-1
-                                        config
-                                        ["pattern1" "pattern2"])))
-        {:keys [index_patterns mappings settings aliases]}
-        (get (sut/get-template conn template-name-1)
-             (keyword template-name-1))]
-    (is (= (:mappings config)
-           mappings))
-    (is (= (:settings config)
-           (:index settings)))
-    (is (= {} (:alias1 aliases)))
-    (is (= {:filter {:term {:user "kimchy"}}
-            :index_routing "kimchy"
-            :search_routing "kimchy"}
-           (:alias2 aliases)))
-    (is (= 2 (count aliases)))
-    (is (= index_patterns ["pattern1" "pattern2"]))
-    (is (= {:acknowledged true}
-           (sut/create-template! conn
-                                 template-name-2
-                                 config)))
-    (is (= ["template-2*"]
-           (-> (sut/get-template conn template-name-2)
-               (get (keyword template-name-2))
-               :index_patterns)))
-    (is (= {:acknowledged true}
-           (sut/delete-template! conn template-name-1)))
-    (is (= {:acknowledged true}
-           (sut/delete-template! conn template-name-2)))
-    (is (nil? (sut/get-template conn template-name-1)))
-    (is (nil? (sut/get-template conn template-name-2)))))
+  (for-each-es-version
+   "template crud operations should trigger valid _template requests"
+   nil
+   (let [template-name-1 "template-1"
+         template-name-2 "template-2"
+         doc-type :malware
+         config {:settings {:number_of_shards "1"
+                            :refresh_interval "2s"}
+                 :mappings (cond->> {:_source {:enabled false}}
+                             (= version 5) (assoc {} doc-type))
+                             :aliases {:alias1 {}
+                                       :alias2 {:filter {:term {:user "kimchy"}}
+                                                :routing "kimchy"}}}
+         _  (is (= {:acknowledged true}
+                   (sut/create-template! conn
+                                         template-name-1
+                                         config
+                                         ["pattern1" "pattern2"])))
+         {:keys [template index_patterns mappings settings aliases]}
+         (get (sut/get-template conn template-name-1)
+              (keyword template-name-1))]
+     (is (= (:mappings config)
+            mappings))
+     (is (= (:settings config)
+            (:index settings)))
+     (is (= {} (:alias1 aliases)))
+     (is (= {:filter {:term {:user "kimchy"}}
+             :index_routing "kimchy"
+             :search_routing "kimchy"}
+            (:alias2 aliases)))
+     (is (= 2 (count aliases)))
+     (if (= version 5)
+       (is (= template "pattern1"))
+       (is (= index_patterns ["pattern1" "pattern2"])))
+     (is (= {:acknowledged true}
+            (sut/create-template! conn
+                                  template-name-2
+                                  config)))
+     (let [template (-> (sut/get-template conn template-name-2)
+                        (get (keyword template-name-2)))]
+       (if (= version 5)
+         (is (= "template-2*" (:template template)))
+         (is (= ["template-2*"] (:index_patterns template)))))
+     (is (= {:acknowledged true}
+            (sut/delete-template! conn template-name-1)))
+     (is (= {:acknowledged true}
+            (sut/delete-template! conn template-name-2)))
+     (is (nil? (sut/get-template conn template-name-1)))
+     (is (nil? (sut/get-template conn template-name-2))))))
