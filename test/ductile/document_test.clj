@@ -56,6 +56,10 @@
   (is (= (sut/update-doc-uri "http://127.0.0.1"
                              "test-index"
                              "test-id")
+         (sut/update-doc-uri "http://127.0.0.1"
+                             "test-index"
+                             nil
+                             "test-id")
          "http://127.0.0.1/test-index/_update/test-id"))
   (is (= (sut/update-doc-uri "http://127.0.0.1"
                              "test-index"
@@ -153,35 +157,25 @@
                      :test_value 42}
          doc-type (if (= version 5) "test-type" "_doc")
          sample-docs
-         (repeatedly 10 #(cond-> (hash-map :id (.toString (java.util.UUID/randomUUID))
-                                           :_index "test_index"
-                                           :bar "foo")
-                           (= 5 version) (assoc :_type doc-type)))
+         (repeatedly 10 #(hash-map :id (.toString (java.util.UUID/randomUUID))
+                                   :_index "test_index"
+                                   :bar "foo"
+                                   :_type doc-type))
          get-doc (fn [doc-id opts]
-                   (if (< 5 version)
-                     (sut/get-doc conn "test_index" doc-id opts)
-                     (sut/get-doc conn "test_index" doc-type doc-id opts)))
+                   (sut/get-doc conn "test_index" doc-type doc-id opts))
          get-sample-doc #(get-doc (:id sample-doc) {})
 
          create-doc (fn [doc opts]
-                      (if (< 5 version)
-                        (sut/create-doc conn "test_index" doc opts)
-                        (sut/create-doc conn "test_index" doc-type doc opts)))
+                      (sut/create-doc conn "test_index" doc-type doc opts))
 
          index-doc (fn [doc opts]
-                     (if (< 5 version)
-                       (sut/index-doc conn "test_index" doc opts)
-                       (sut/index-doc conn "test_index" doc-type doc opts)))
+                     (sut/index-doc conn "test_index" doc-type doc opts))
 
          delete-doc (fn [doc-id opts]
-                      (if (< 5 version)
-                        (sut/delete-doc conn "test_index" doc-id opts)
-                        (sut/delete-doc conn "test_index" doc-type doc-id opts)))
+                      (sut/delete-doc conn "test_index" doc-type doc-id opts))
 
          update-doc (fn [doc-id doc opts]
-                      (if (< 5 version)
-                        (sut/update-doc conn "test_index" doc-id doc opts)
-                        (sut/update-doc conn "test_index" doc-type doc-id doc opts)))]
+                      (sut/update-doc conn "test_index" doc-type doc-id doc opts))]
      (testing "create-doc and get-doc"
        (is (nil? (get-sample-doc)))
        (is (= {:_id (-> sample-doc :id str)

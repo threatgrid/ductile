@@ -37,9 +37,11 @@
              (uri/uri-encode index-name)
              "_update"
              (uri/uri-encode id))))
-  ([uri index-name id doc-type]
-   (-> (index-doc-uri uri index-name id doc-type)
-       (str "/_update"))))
+  ([uri index-name doc-type id]
+   (if doc-type
+     (-> (index-doc-uri uri index-name doc-type id)
+         (str "/_update"))
+     (update-doc-uri uri index-name id))))
 
 (defn bulk-uri
   "make an uri for bulk action"
@@ -93,12 +95,15 @@
 
 (s/defn get-doc
   "get a document on es and return only the source"
-  ([{:keys [uri cm] :as conn} :- ESConn
+  ([{:keys [uri cm version] :as conn} :- ESConn
     index-name :- s/Str
     type-name :- (s/maybe s/Str)
     id :- s/Str
     opts :- CRUDOptions]
-   (-> (get-doc-uri uri index-name type-name id)
+   (-> (get-doc-uri uri
+                    index-name
+                    (when (= version 5) type-name)
+                    id)
        (client/get (conn/make-http-opts cm opts [:_source]))
        conn/safe-es-read
        :_source))
@@ -109,7 +114,7 @@
    (get-doc conn index-name nil id opts)))
 
 (s/defn ^:private index-doc-internal
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri cm version]} :- ESConn
    index-name :- s/Str
    doc-type :- (s/maybe s/Str)
    doc :- s/Any
@@ -120,9 +125,13 @@
         valid-opts (cond-> [:refresh]
                      ;; es5 does not allow op_type=create when no id is provided
                      ;; https://github.com/elastic/elasticsearch/issues/21535#issuecomment-260467699
-                     doc-id (conj :op_type))]
+                     doc-id (conj :op_type))
+        uri (index-doc-uri uri
+                           index-name
+                           (when (= version 5) doc-type)
+                           doc-id)]
     (conn/safe-es-read
-     (client/post (index-doc-uri uri index-name doc-type doc-id)
+     (client/post uri
                   (conn/make-http-opts cm opts valid-opts doc nil)))))
 
 (s/defn index-doc
@@ -206,11 +215,12 @@
     docs :- [s/Any]
     opts :- CRUDOptions]
    (bulk-create-doc conn docs opts nil))
-  ([conn :- ESConn
+  ([{:keys [version] :as conn} :- ESConn
     docs :- [s/Any]
     opts :- CRUDOptions
     max-size :- (s/maybe s/Int)]
-   (let [ops (bulk-index docs)
+   (let [ops (bulk-index (cond->> docs
+                           (= version 7) (map #(dissoc % :_type))))
          json-ops (map (fn [xs]
                          (->> xs
                               (map #(json/generate-string % {:pretty false}))
@@ -239,21 +249,23 @@
 
 (s/defn update-doc
   "update a document on es return the updated document"
-  ([{:keys [uri cm]} :- ESConn
+  ([{:keys [uri cm version]} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     id :- s/Str
     doc :- s/Any
     opts :- CRUDOptions]
-   (-> (update-doc-uri uri index-name doc-type id)
+   (-> (update-doc-uri uri
+                       index-name
+                       (when (= version 5) doc-type)
+                       id)
        (update-doc-raw cm doc opts)))
-  ([{:keys [uri cm]} :- ESConn
+  ([es-conn :- ESConn
     index-name :- s/Str
     id :- s/Str
     doc :- s/Any
     opts :- CRUDOptions]
-   (-> (update-doc-uri uri index-name id)
-       (update-doc-raw cm doc opts))))
+   (update-doc es-conn index-name nil id doc opts)))
 
 (s/defn delete-doc
   "delete a document on es, returns boolean"
@@ -262,13 +274,16 @@
     id :- s/Str
     opts :- CRUDOptions]
    (delete-doc conn index-name nil id opts))
-  ([{:keys [uri cm]} :- ESConn
+  ([{:keys [uri cm version]} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     id :- s/Str
     opts :- CRUDOptions]
-  (-> (client/delete (delete-doc-uri uri index-name doc-type id)
-                     (conn/make-http-opts cm opts [:refresh]))
+   (-> (delete-doc-uri uri
+                       index-name
+                       (when (= version 5) doc-type)
+                       id)
+       (client/delete (conn/make-http-opts cm opts [:refresh]))
       conn/safe-es-read
       :result
       (= "deleted"))))
