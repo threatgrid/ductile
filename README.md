@@ -2,7 +2,7 @@
 
 A minimalist clojure library for Elasticsearch REST API.
 
-It's currently compatible with Elasticsearch 7.X
+It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited support to prior Elasticsearch version (5 and 6) through a compatibility mode that is more intended to help migrating data.
 
 ## Usage
 
@@ -14,11 +14,13 @@ It's currently compatible with Elasticsearch 7.X
 
 (def c (es-conn/connect {:host "localhost"
                          :port 9200
+                         :version 7
                          :protocol :http
                          :timeout 20000}))
 ```
 
-Only `host` and `port` are required, the default protocol value is `:http` and the default timeout is 30000 ms.
+Only `host` and `port` are required, the default version value is 7, the default protocol value is `:http`, and the default timeout is 30000 ms. 
+The `version` field accepts an integer value to specify the major Elasticsearch version, and is used for the compatibility mode with Elasticsearch 5.x and 6.x.
 
 ### index operations
 
@@ -35,6 +37,7 @@ Only `host` and `port` are required, the default protocol value is `:http` and t
                                           :age {:type :long}
                                           :description {:type :text}}}
                   :aliases {:test-alias {}}})
+;; for Elasticsearch 5.x compatibility, you must specify the document type(s) in the mappings.
 
 (es-index/create! c "test-index" test-config)
 
@@ -219,6 +222,21 @@ it returns the patched document
                         {:wait_for_completion true
                         :refresh "true"})))
  
+```
+
+* Elasticsearch 5.x compatibility
+
+Any of the previous functions can be used on an Elasticsearch 5.x cluster by specifying the document type as a supplementary parameter after the index name. 
+
+```clojure
+(es-doc/get-doc c
+                "test-index"
+                "test-type"
+                1
+                {})
+```
+```javascript
+{:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}
 ```
 
 ### and of course you can query it!

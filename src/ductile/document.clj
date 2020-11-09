@@ -97,12 +97,12 @@
   "get a document on es and return only the source"
   ([{:keys [uri cm version] :as conn} :- ESConn
     index-name :- s/Str
-    type-name :- (s/maybe s/Str)
+    doc-type :- (s/maybe s/Str)
     id :- s/Str
     opts :- CRUDOptions]
    (-> (get-doc-uri uri
                     index-name
-                    (when (= version 5) type-name)
+                    (when (= version 5) doc-type)
                     id)
        (client/get (conn/make-http-opts cm opts [:_source]))
        conn/safe-es-read
