@@ -12,7 +12,8 @@
                  [metosin/schema-tools "0.12.2"]
                  [clj-http "3.10.1"]
                  [com.arohner/uri "0.1.2"]
-                 [cheshire "5.9.0"]]
+                 [cheshire "5.9.0"]
+                 [medley "1.3.0"]]
   :repositories [["sonatype-snapshots" {:url "https://oss.sonatype.org/content/repositories/snapshots/"}]]
   :main nil
   :codox {:output-path "doc"

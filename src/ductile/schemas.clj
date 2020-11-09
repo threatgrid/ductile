@@ -10,6 +10,7 @@
    {:host s/Str
     :port s/Int
     (s/optional-key :protocol) (s/enum :http :https)
+    (s/optional-key :version) s/Int
     (s/optional-key :timeout) s/Int}))
 
 (s/defschema ESConn
@@ -17,7 +18,8 @@
    connection manager and an index name"
   {:cm (s/either PoolingClientConnectionManager
                  PoolingHttpClientConnectionManager)
-   :uri s/Str})
+   :uri s/Str
+   :version s/Int})
 
 (s/defschema Refresh
   "ES refresh parameter, see
