@@ -1,6 +1,6 @@
 (def clj-version "1.10.1")
 
-(defproject threatgrid/ductile "0.2.0"
+(defproject threatgrid/ductile "0.2.1-SNAPSHOT"
   :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
