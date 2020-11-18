@@ -471,8 +471,8 @@
 
 (deftest ^:integration delete-by-query-test
   (let [indexname (str "test_index" (UUID/randomUUID))
-        indexname1 (str indexname \- 1)
-        indexname2 (str indexname \- 2)]
+        indexname1 (str indexname "-1")
+        indexname2 (str indexname "-2")]
     (for-each-es-version
      "delete-by-query should trigger a proper _delete_by_query request"
      #(es-index/delete! conn indexname)
