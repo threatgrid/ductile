@@ -1,7 +1,6 @@
 (ns ductile.document
   (:require [cemerick.uri :as uri]
             [cheshire.core :as json]
-            [clj-http.client :as client]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
             [ductile.conn :as conn]
@@ -95,16 +94,18 @@
 
 (s/defn get-doc
   "get a document on es and return only the source"
-  ([{:keys [uri cm version] :as conn} :- ESConn
+  ([{:keys [uri cm request-fn version]} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     id :- s/Str
     opts :- CRUDOptions]
-   (-> (get-doc-uri uri
-                    index-name
-                    (when (= version 5) doc-type)
-                    id)
-       (client/get (conn/make-http-opts cm opts [:_source]))
+   (-> (conn/make-http-opts cm opts [:_source])
+       (assoc :method :get
+              :url (get-doc-uri uri
+                                index-name
+                                (when (= version 5) doc-type)
+                                id))
+       request-fn
        conn/safe-es-read
        :_source))
   ([conn :- ESConn
@@ -114,7 +115,7 @@
    (get-doc conn index-name nil id opts)))
 
 (s/defn ^:private index-doc-internal
-  [{:keys [uri cm version]} :- ESConn
+  [{:keys [uri cm request-fn version]} :- ESConn
    index-name :- s/Str
    doc-type :- (s/maybe s/Str)
    doc :- s/Any
@@ -130,9 +131,11 @@
                            index-name
                            (when (= version 5) doc-type)
                            doc-id)]
-    (conn/safe-es-read
-     (client/post uri
-                  (conn/make-http-opts cm opts valid-opts doc nil)))))
+    (-> (conn/make-http-opts cm opts valid-opts doc nil)
+        (assoc :method :post
+               :url uri)
+        request-fn
+        conn/safe-es-read)))
 
 (s/defn index-doc
   "index a document on es return the indexed document"
@@ -195,17 +198,19 @@
 
 (defn ^:private bulk-post-docs
   [json-ops
-   {:keys [uri cm] :as _conn}
+   {:keys [uri request-fn cm]}
    opts]
   (let [bulk-body (-> json-ops
                       (interleave (repeat "\n"))
                       string/join)]
-    (-> (client/post (bulk-uri uri)
-                     (conn/make-http-opts cm
-                                          opts
-                                          [:refresh]
-                                          nil
-                                          bulk-body))
+    (-> (conn/make-http-opts cm
+                             opts
+                             [:refresh]
+                             nil
+                             bulk-body)
+        (assoc :method :post
+               :url (bulk-uri uri))
+        request-fn
         conn/safe-es-read
         conn/safe-es-bulk-read)))
 
@@ -234,22 +239,23 @@
      docs)))
 
 (defn ^:private update-doc-raw
-  [uri cm doc opts]
-  (-> (client/post
-       uri
-       (conn/make-http-opts cm
-                            (into {:_source true
-                                   :retry_on_conflict default-retry-on-conflict}
-                                  opts)
-                            [:_source :retry_on_conflict :refresh]
-                            {:doc doc}
-                            nil))
+  [uri cm doc request-fn opts]
+  (-> (conn/make-http-opts cm
+                           (into {:_source true
+                                  :retry_on_conflict default-retry-on-conflict}
+                                 opts)
+                           [:_source :retry_on_conflict :refresh]
+                           {:doc doc}
+                           nil)
+      (assoc :method :post
+             :url uri)
+      request-fn
       conn/safe-es-read
       (get-in [:get :_source])))
 
 (s/defn update-doc
   "update a document on es return the updated document"
-  ([{:keys [uri cm version]} :- ESConn
+  ([{:keys [uri cm request-fn version]} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     id :- s/Str
@@ -259,7 +265,7 @@
                        index-name
                        (when (= version 5) doc-type)
                        id)
-       (update-doc-raw cm doc opts)))
+       (update-doc-raw cm doc request-fn opts)))
   ([es-conn :- ESConn
     index-name :- s/Str
     id :- s/Str
@@ -274,19 +280,21 @@
     id :- s/Str
     opts :- CRUDOptions]
    (delete-doc conn index-name nil id opts))
-  ([{:keys [uri cm version]} :- ESConn
+  ([{:keys [uri cm request-fn version]} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     id :- s/Str
     opts :- CRUDOptions]
-   (-> (delete-doc-uri uri
-                       index-name
-                       (when (= version 5) doc-type)
-                       id)
-       (client/delete (conn/make-http-opts cm opts [:refresh]))
-      conn/safe-es-read
-      :result
-      (= "deleted"))))
+   (-> (conn/make-http-opts cm opts [:refresh])
+       (assoc :method :delete
+              :url (delete-doc-uri uri
+                                   index-name
+                                   (when (= version 5) doc-type)
+                                   id))
+       request-fn
+       conn/safe-es-read
+       :result
+       (= "deleted"))))
 
 (s/defn delete-by-query-uri
   [uri index-names]
@@ -297,27 +305,28 @@
 
 (s/defn delete-by-query
   "delete all documents that match a query in an index"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-names :- [s/Str]
    q :- ESQuery
    opts :- CRUDOptions]
-  (conn/safe-es-read
-   (client/post
-    (delete-by-query-uri uri index-names)
-    (conn/make-http-opts cm
-                         opts
-                         [:refresh :wait_for_completion]
-                         {:query q}
-                         nil))))
+  (-> (conn/make-http-opts cm
+                           opts
+                           [:refresh :wait_for_completion]
+                           {:query q}
+                           nil)
+      (assoc :method :post
+             :url (delete-by-query-uri uri index-names))
+      request-fn
+      conn/safe-es-read))
 
 (defn sort-params
   [sort_by sort_order]
   (let [sort-fields
         (map (fn [field]
-               (let [[field-name field-order] (clojure.string/split field #":")]
+               (let [[field-name field-order] (string/split field #":")]
                  {field-name
                   {:order (keyword (or field-order sort_order))}}))
-             (clojure.string/split (name sort_by) #","))]
+             (string/split (name sort_by) #","))]
 
     {:sort (into {} sort-fields)}))
 
@@ -347,17 +356,18 @@
 
 (s/defn count-docs
   "Count documents on ES matching given query."
-  ([{:keys [uri cm]} :- ESConn
+  ([{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str
    query :- (s/maybe ESQuery)]
-   (-> (client/post
-        (count-uri uri index-name)
-        (conn/make-http-opts cm
-                             {}
-                             []
-                             (when query
-                               {:query query})
-                             nil))
+   (-> (conn/make-http-opts cm
+                            {}
+                            []
+                            (when query
+                              {:query query})
+                            nil)
+       (assoc :method :post
+              :url (count-uri uri index-name))
+       request-fn
        conn/safe-es-read
        :count))
   ([es-conn :- ESConn
@@ -390,21 +400,22 @@
 
 (s/defn query
   "Search for documents on ES using any query. Performs aggregations when specified."
-  ([{:keys [uri cm]} :- ESConn
+  ([{:keys [uri request-fn cm]} :- ESConn
     index-name :- (s/maybe s/Str)
     q :- (s/maybe ESQuery)
     aggs :- (s/maybe ESAggs)
     {:keys [full-hits?]
      :as params} :- s/Any]
    (let [search-params (generate-search-params q aggs params)
-         res (conn/safe-es-read
-              (client/post
-               (search-uri uri index-name)
-               (conn/make-http-opts cm
-                                    {}
-                                    []
-                                    search-params
-                                    nil)))]
+         res (-> (conn/make-http-opts cm
+                                      {}
+                                      []
+                                      search-params
+                                      nil)
+                 (assoc :method :post
+                        :url (search-uri uri index-name))
+                 request-fn
+                 conn/safe-es-read)]
      (log/debug "search:" search-params)
      (format-result res search-params full-hits?)))
   ([es-conn index-name q params]
