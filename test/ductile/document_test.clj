@@ -193,7 +193,7 @@
              (is (= wo-id-doc
                     (get-doc _id {})))))
          (testing "with custom mk-id"
-           (let [doc-id (str (java.util.UUID/randomUUID))
+           (let [doc-id (str (UUID/randomUUID))
                  doc {:description "Lorem ipsum dolor sit amet"}
                  {:keys [_id result]} (create-doc doc
                                                   {:mk-id (constantly doc-id)
@@ -289,7 +289,7 @@
      "search_after must enable consitent pagination"
      #(es-index/delete! conn indexname)
      (let [docs
-           (let [make-id #(str (java.util.UUID/randomUUID))]
+           (let [make-id #(str (UUID/randomUUID))]
              (map
               #(hash-map :id (make-id)
                          :foo %
