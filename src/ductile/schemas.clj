@@ -5,13 +5,19 @@
   (:import [org.apache.http.impl.conn PoolingClientConnectionManager
             PoolingHttpClientConnectionManager]))
 
+(s/defschema RequestFn
+  "A function implementing the 1-argument
+  arity of clj-http.client/request."
+  (s/=> s/Any (s/named s/Any 'req)))
+
 (s/defschema ConnectParams
   (st/open-schema
    {:host s/Str
     :port s/Int
     (s/optional-key :protocol) (s/enum :http :https)
     (s/optional-key :version) s/Int
-    (s/optional-key :timeout) s/Int}))
+    (s/optional-key :timeout) s/Int
+    (s/optional-key :request-fn) RequestFn}))
 
 (s/defschema ESConn
   "an ES conn is a map with a
@@ -19,7 +25,8 @@
   {:cm (s/either PoolingClientConnectionManager
                  PoolingHttpClientConnectionManager)
    :uri s/Str
-   :version s/Int})
+   :version s/Int
+   :request-fn RequestFn})
 
 (s/defschema Refresh
   "ES refresh parameter, see

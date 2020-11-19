@@ -1,7 +1,6 @@
 (ns ductile.index
   (:refer-clojure :exclude [get])
   (:require [cemerick.uri :as uri]
-            [clj-http.client :as client]
             [ductile.conn :refer [make-http-opts safe-es-read]]
             [ductile.schemas :refer [ESConn RolloverConditions]]
             [schema.core :as s]))
@@ -45,45 +44,54 @@
 
 (s/defn index-exists? :- s/Bool
   "check if the supplied ES index exists"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str]
   (not= 404
-     (:status (client/head (index-uri uri index-name)
-                           (make-http-opts cm)))))
+        (-> (make-http-opts cm)
+            (assoc :method :head
+                   :url (index-uri uri index-name))
+            request-fn
+            :status)))
 
 (s/defn create!
   "create an index"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str
    settings :- s/Any]
-  (safe-es-read
-   (client/put (index-uri uri index-name)
-               (make-http-opts cm
-                                {}
-                                []
-                                settings
-                                nil))))
+  (-> (make-http-opts cm
+                      {}
+                      []
+                      settings
+                      nil)
+      (assoc :method :put
+             :url (index-uri uri index-name))
+      request-fn
+      safe-es-read))
 
 (s/defn update-settings!
   "update an ES index settings"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str
    settings :- s/Any]
-  (safe-es-read
-   (client/put (str (index-uri uri index-name) "/_settings")
-               (make-http-opts cm {} [] settings nil))))
+  (-> (make-http-opts cm {} [] settings nil)
+      (assoc :method :put
+             :url (str (index-uri uri index-name) "/_settings"))
+      request-fn
+      safe-es-read))
 
 (s/defn update-mappings!
   "Update an ES index mapping. takes a mappings map
   from field names to mapping types."
-  ([{:keys [uri cm] :as conn} :- ESConn
+  ([{:keys [uri request-fn cm] :as conn} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     mappings :- (s/pred map?)]
-   (-> (index-uri uri index-name)
-       (uri/uri "_mapping" doc-type)
-       str
-       (client/put (make-http-opts cm {} [] mappings nil))
+   (-> (make-http-opts cm {} [] mappings nil)
+       (assoc :method :put
+              :url (-> (index-uri uri index-name)
+                       (uri/uri "_mapping" doc-type)
+                       str))
+       request-fn
        safe-es-read))
   ([conn :- ESConn
     index-name :- s/Str
@@ -92,40 +100,48 @@
 
 (s/defn get
   "get an index"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str]
-  (safe-es-read
-   (client/get (index-uri uri index-name)
-               (make-http-opts cm))))
+  (-> (make-http-opts cm)
+      (assoc :method :get
+             :url (index-uri uri index-name))
+      request-fn
+      safe-es-read))
 
 (s/defn delete!
   "delete indexes using a wildcard"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-wildcard :- s/Str]
-  (safe-es-read
-   (client/delete (index-uri uri index-wildcard)
-                  (make-http-opts  cm))))
+  (-> (make-http-opts cm)
+      (assoc :method :delete
+             :url (index-uri uri index-wildcard))
+      request-fn
+      safe-es-read))
 
 (s/defn get-template
   "get an index template"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str]
-  (safe-es-read
-   (client/get (template-uri uri index-name)
-               (make-http-opts cm))))
+  (-> (make-http-opts cm)
+      (assoc :method :get
+             :url (template-uri uri index-name))
+      request-fn
+      safe-es-read))
 
 (s/defn create-template!
   "create an index template, update if already exists"
-  ([{:keys [uri cm version]} :- ESConn
+  ([{:keys [uri cm request-fn version]} :- ESConn
     template-name :- s/Str
     index-config
     index-patterns :- [s/Str]]
    (let [template (cond-> index-config
                     (>= version 6) (assoc :index_patterns index-patterns)
                     (= version 5) (assoc :template (first index-patterns)))]
-    (safe-es-read
-     (client/put (template-uri uri template-name)
-                 (make-http-opts cm {} nil template nil)))))
+     (-> (make-http-opts cm {} nil template nil)
+         (assoc :method :put
+                :url (template-uri uri template-name))
+         request-fn
+         safe-es-read)))
   ([es-conn :- ESConn
     template-name :- s/Str
     index-config]
@@ -136,52 +152,62 @@
 
 (s/defn delete-template!
   "delete a template"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str]
-  (safe-es-read
-   (client/delete (template-uri uri index-name)
-                  (make-http-opts cm))))
+  (-> (make-http-opts cm)
+      (assoc :method :delete
+             :url (template-uri uri index-name))
+      request-fn
+      safe-es-read))
 
 (s/defn refresh!
   "refresh an index"
   ([es-conn] (refresh! es-conn nil))
-  ([{:keys [uri cm]} :- ESConn
+  ([{:keys [uri request-fn cm]} :- ESConn
     index-name :- (s/maybe s/Str)]
-   (safe-es-read
-    (client/post (refresh-uri uri index-name)
-                 (make-http-opts cm)))))
+   (-> (make-http-opts cm)
+       (assoc :method :post
+              :url (refresh-uri uri index-name))
+       request-fn
+       safe-es-read)))
 
 (s/defn open!
   "open an index"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str]
-  (safe-es-read
-   (client/post (str (index-uri uri index-name) "/_open")
-                (make-http-opts cm))))
+  (-> (make-http-opts cm)
+      (assoc :method :post
+             :url (str (index-uri uri index-name) "/_open"))
+      request-fn
+      safe-es-read))
 
 (s/defn close!
   "close an index"
-  [{:keys [uri cm]} :- ESConn
+  [{:keys [uri request-fn cm]} :- ESConn
    index-name :- s/Str]
-  (safe-es-read
-   (client/post (str (index-uri uri index-name) "/_close")
-                (make-http-opts cm))))
+  (-> (make-http-opts cm)
+      (assoc :method :post
+             :url (str (index-uri uri index-name) "/_close"))
+      request-fn
+      safe-es-read))
 
 (s/defn rollover!
   "run a rollover query on an alias with given conditions"
   ([es-conn alias conditions]
    (rollover! es-conn alias conditions {} nil false))
-  ([{:keys [uri cm]} :- ESConn
+  ([{:keys [uri request-fn cm]} :- ESConn
     alias :- s/Str
     conditions :- RolloverConditions
     new-index-settings :- {s/Any s/Any}
     new-index-name :- (s/maybe s/Str)
     dry_run :- (s/maybe s/Bool)]
-   (safe-es-read
-    (client/post (rollover-uri uri alias new-index-name dry_run)
-                 (make-http-opts cm
-                                 {}
-                                 []
-                                 {:conditions conditions
-                                  :settings new-index-settings}
-                                 nil)))))
+   (-> (make-http-opts cm
+                       {}
+                       []
+                       {:conditions conditions
+                        :settings new-index-settings}
+                       nil)
+       (assoc :method :post
+              :url (rollover-uri uri alias new-index-name dry_run))
+       request-fn
+       safe-es-read)))

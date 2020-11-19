@@ -1,9 +1,9 @@
 (ns ductile.conn
-  (:require [clj-http.conn-mgr :refer [make-reusable-conn-manager
+  (:require [clj-http.client :as client]
+            [clj-http.conn-mgr :refer [make-reusable-conn-manager
                                        shutdown-manager]]
             [clojure.tools.logging :as log]
             [ductile.schemas :refer [ConnectParams ESConn]]
-            [medley.core :refer [assoc-some]]
             [schema.core :as s]))
 
 (def default-timeout 30000)
@@ -37,16 +37,21 @@
   (make-reusable-conn-manager cm-options))
 
 (s/defn connect :- ESConn
-  "instantiate an ES conn from props"
-  [{:keys [protocol host port timeout version]
+  "Instantiate an ES conn from props.
+  
+  To intercept all ES HTTP requests, set :request-fn
+  to function with the same interface as the 1-argument
+  arity of `clj-http.client/request`."
+  [{:keys [protocol host port timeout version request-fn]
     :or {protocol :http
+         request-fn client/request
          timeout default-timeout
          version 7}} :- ConnectParams]
-  (assoc-some
-   {:cm (make-connection-manager
+  {:cm (make-connection-manager
          (cm-options {:timeout timeout}))
-    :uri (format "%s://%s:%s" (name protocol) host port)}
-    :version version))
+   :request-fn request-fn
+   :uri (format "%s://%s:%s" (name protocol) host port)
+   :version version})
 
 (s/defn close [conn :- ESConn]
   (-> conn :cm shutdown-manager))
