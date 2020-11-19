@@ -2,8 +2,7 @@
 (def ring-version "1.1.2")
 
 (def test-deps
-  `[[ring/ring-codec ~ring-version]
-    [ring/ring-defaults "0.3.2"]])
+  `[[ring/ring-codec ~ring-version]])
 
 (defproject threatgrid/ductile "0.2.1-SNAPSHOT"
   :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
