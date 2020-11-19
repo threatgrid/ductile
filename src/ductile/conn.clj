@@ -37,7 +37,11 @@
   (make-reusable-conn-manager cm-options))
 
 (s/defn connect :- ESConn
-  "instantiate an ES conn from props"
+  "Instantiate an ES conn from props.
+  
+  To intercept all ES HTTP requests, set :request-fn
+  to function with the same interface as the 1-argument
+  arity of `clj-http.client/request`."
   [{:keys [protocol host port timeout version request-fn]
     :or {protocol :http
          request-fn client/request

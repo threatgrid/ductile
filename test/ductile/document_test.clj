@@ -475,7 +475,7 @@
         indexname2 (str indexname "-2")]
     (for-each-es-version
      "delete-by-query should trigger a proper _delete_by_query request"
-     #(es-index/delete! conn indexname)
+     #(es-index/delete! conn (str indexname "*"))
      (let [sample-docs-1 (mapv #(cond-> {:_index indexname1
                                          :foo (if (< % 5)
                                                 :bar1

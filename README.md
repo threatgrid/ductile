@@ -298,6 +298,43 @@ Ductile also provides a search function with a simple interface that offers to u
                     {:sort {:name {:order :desc}}})
 ```
 
+### Test stubbing
+
+To stub ES calls, provide a custom `:request-fn` to `es-conn/connect`.
+It should implement the same interface as the 1-argument version
+of `clj-http.client/request`.
+
+```clojure
+(require '[ductile.conn :as es-conn]
+         '[clj-http.client :as client])
+
+(def c (es-conn/connect {:host "localhost"
+                         :port 9200
+                         :request-fn (fn [req]
+                                       {:status 200
+                                        :headers {:content-type "application/clojure"}})}))
+```
+
+See the middleware provided by `clj-http.client/wrap-*` for simulating more interesting cases.
+For example, this intercepts query-params and prints them:
+
+```clojure
+(require '[ductile.conn :as es-conn]
+         '[ring.util.codec :refer [form-decode]]
+         '[clojure.walk :refer [keywordize-keys]]
+         '[clj-http.client :as client])
+
+(def c (es-conn/connect {:host "localhost"
+                         :port 9200
+                         :request-fn
+                         (-> (fn [req]
+                               (prn {:query-params (keywordize-keys (form-decode (:query-string req)))})
+                               {:status 200
+                                :headers {:content-type "application/clojure"}})
+                             client/wrap-query-params)}))
+```
+
+
 
 ## License
 
