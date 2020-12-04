@@ -4,7 +4,7 @@
 (def test-deps
   `[[ring/ring-codec ~ring-version]])
 
-(defproject threatgrid/ductile "0.2.1-SNAPSHOT"
+(defproject threatgrid/ductile "0.3.0-SNAPSHOT"
   :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
@@ -15,7 +15,8 @@
                  [metosin/schema-tools "0.12.2"]
                  [clj-http "3.10.1"]
                  [com.arohner/uri "0.1.2"]
-                 [cheshire "5.9.0"]]
+                 [cheshire "5.9.0"]
+                 [base64-clj "0.1.1"]]
   :repositories [["sonatype-snapshots" {:url "https://oss.sonatype.org/content/repositories/snapshots/"}]]
   :main nil
   :codox {:output-path "doc"

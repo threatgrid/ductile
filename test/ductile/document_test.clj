@@ -177,7 +177,7 @@
                         (sut/delete-doc conn indexname doc-type doc-id opts))
 
            update-doc (fn [doc-id doc opts]
-                        (sut/update-doc conn indexname doc-type doc-id doc opts))]
+                        (sut/update-doc conn indexname doc-type doc-id doc {}))]
        (testing "create-doc and get-doc"
          (is (nil? (get-sample-doc)))
          (is (= {:_id (-> sample-doc :id str)
@@ -281,7 +281,8 @@
                                  :sort_order :desc})
                :data set)))
        (is (true?
-            (delete-doc (:id sample-doc) {:refresh "true"})))))))
+            (delete-doc (:id sample-doc)
+                        {:refresh "true"})))))))
 
 (deftest ^:integration search_after-consistency-test
   (let [indexname (str "test_index" (UUID/randomUUID))]
@@ -332,8 +333,6 @@
                             sample-docs
                             {:refresh "true"})
        (is (= 10
-              (sut/count-docs conn indexname)
-              (sut/count-docs conn indexname)
               (sut/count-docs conn indexname {:term {:foo :bar}})
               (sut/count-docs conn indexname {:match_all {}})))
        (is (= 3 (sut/count-docs conn indexname {:ids {:values (range 3)}})))))))

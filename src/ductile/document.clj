@@ -94,12 +94,12 @@
 
 (s/defn get-doc
   "get a document on es and return only the source"
-  ([{:keys [uri cm request-fn version]} :- ESConn
+  ([{:keys [uri request-fn version] :as conn} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     id :- s/Str
     opts :- CRUDOptions]
-   (-> (conn/make-http-opts cm opts [:_source])
+   (-> (conn/make-http-opts conn opts [:_source])
        (assoc :method :get
               :url (get-doc-uri uri
                                 index-name
@@ -115,7 +115,7 @@
    (get-doc conn index-name nil id opts)))
 
 (s/defn ^:private index-doc-internal
-  [{:keys [uri cm request-fn version]} :- ESConn
+  [{:keys [uri request-fn version] :as conn} :- ESConn
    index-name :- s/Str
    doc-type :- (s/maybe s/Str)
    doc :- s/Any
@@ -131,7 +131,7 @@
                            index-name
                            (when (= version 5) doc-type)
                            doc-id)]
-    (-> (conn/make-http-opts cm opts valid-opts doc nil)
+    (-> (conn/make-http-opts conn opts valid-opts doc nil)
         (assoc :method :post
                :url uri)
         request-fn
@@ -139,31 +139,31 @@
 
 (s/defn index-doc
   "index a document on es return the indexed document"
-  ([es-conn :- ESConn
+  ([conn :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     doc :- s/Any
     opts :- CRUDOptions]
-   (index-doc-internal es-conn index-name doc-type doc opts))
-  ([es-conn :- ESConn
+   (index-doc-internal conn index-name doc-type doc opts))
+  ([conn :- ESConn
     index-name :- s/Str
     doc :- s/Any
     opts :- CRUDOptions]
-   (index-doc-internal es-conn index-name nil doc opts)))
+   (index-doc-internal conn index-name nil doc opts)))
 
 (s/defn create-doc
   "create a document on es return the created document"
-  ([es-conn :- ESConn
+  ([conn :- ESConn
     index-name :- s/Str
     doc :- s/Any
     opts :- CRUDOptions]
-   (create-doc es-conn index-name nil doc opts))
-  ([es-conn :- ESConn
+   (create-doc conn index-name nil doc opts))
+  ([conn :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     doc :- s/Any
     opts :- CRUDOptions]
-   (index-doc-internal es-conn
+   (index-doc-internal conn
                        index-name
                        doc-type
                        doc
@@ -198,12 +198,12 @@
 
 (defn ^:private bulk-post-docs
   [json-ops
-   {:keys [uri request-fn cm]}
+   {:keys [uri request-fn] :as conn}
    opts]
   (let [bulk-body (-> json-ops
                       (interleave (repeat "\n"))
                       string/join)]
-    (-> (conn/make-http-opts cm
+    (-> (conn/make-http-opts conn
                              opts
                              [:refresh]
                              nil
@@ -239,8 +239,8 @@
      docs)))
 
 (defn ^:private update-doc-raw
-  [uri cm doc request-fn opts]
-  (-> (conn/make-http-opts cm
+  [uri conn doc request-fn opts]
+  (-> (conn/make-http-opts conn
                            (into {:_source true
                                   :retry_on_conflict default-retry-on-conflict}
                                  opts)
@@ -255,7 +255,7 @@
 
 (s/defn update-doc
   "update a document on es return the updated document"
-  ([{:keys [uri cm request-fn version]} :- ESConn
+  ([{:keys [uri request-fn version] :as conn} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     id :- s/Str
@@ -265,13 +265,13 @@
                        index-name
                        (when (= version 5) doc-type)
                        id)
-       (update-doc-raw cm doc request-fn opts)))
-  ([es-conn :- ESConn
+       (update-doc-raw conn doc request-fn opts)))
+  ([conn :- ESConn
     index-name :- s/Str
     id :- s/Str
     doc :- s/Any
     opts :- CRUDOptions]
-   (update-doc es-conn index-name nil id doc opts)))
+   (update-doc conn index-name nil id doc opts)))
 
 (s/defn delete-doc
   "delete a document on es, returns boolean"
@@ -280,12 +280,12 @@
     id :- s/Str
     opts :- CRUDOptions]
    (delete-doc conn index-name nil id opts))
-  ([{:keys [uri cm request-fn version]} :- ESConn
+  ([{:keys [uri request-fn version] :as conn} :- ESConn
     index-name :- s/Str
     doc-type :- (s/maybe s/Str)
     id :- s/Str
     opts :- CRUDOptions]
-   (-> (conn/make-http-opts cm opts [:refresh])
+   (-> (conn/make-http-opts conn opts [:refresh])
        (assoc :method :delete
               :url (delete-doc-uri uri
                                    index-name
@@ -305,11 +305,11 @@
 
 (s/defn delete-by-query
   "delete all documents that match a query in an index"
-  [{:keys [uri request-fn cm]} :- ESConn
+  [{:keys [uri request-fn] :as conn} :- ESConn
    index-names :- [s/Str]
    q :- ESQuery
    opts :- CRUDOptions]
-  (-> (conn/make-http-opts cm
+  (-> (conn/make-http-opts conn
                            opts
                            [:refresh :wait_for_completion]
                            {:query q}
@@ -356,10 +356,10 @@
 
 (s/defn count-docs
   "Count documents on ES matching given query."
-  ([{:keys [uri request-fn cm]} :- ESConn
-   index-name :- s/Str
-   query :- (s/maybe ESQuery)]
-   (-> (conn/make-http-opts cm
+  [{:keys [uri request-fn] :as conn} :- ESConn
+    index-name :- s/Str
+    query :- (s/maybe ESQuery)]
+   (-> (conn/make-http-opts conn
                             {}
                             []
                             (when query
@@ -370,9 +370,6 @@
        request-fn
        conn/safe-es-read
        :count))
-  ([es-conn :- ESConn
-    index-name :- s/Str]
-   (count-docs es-conn index-name nil)))
 
 (defn ^:private result-data
   [res full-hits?]
@@ -400,14 +397,13 @@
 
 (s/defn query
   "Search for documents on ES using any query. Performs aggregations when specified."
-  ([{:keys [uri request-fn cm]} :- ESConn
+  ([{:keys [uri request-fn] :as conn} :- ESConn
     index-name :- (s/maybe s/Str)
     q :- (s/maybe ESQuery)
     aggs :- (s/maybe ESAggs)
-    {:keys [full-hits?]
-     :as params} :- s/Any]
-   (let [search-params (generate-search-params q aggs params)
-         res (-> (conn/make-http-opts cm
+    {:keys [full-hits?] :as opts} :- s/Any]
+   (let [search-params (generate-search-params q aggs opts)
+         res (-> (conn/make-http-opts conn
                                       {}
                                       []
                                       search-params
@@ -418,16 +414,16 @@
                  conn/safe-es-read)]
      (log/debug "search:" search-params)
      (format-result res search-params full-hits?)))
-  ([es-conn index-name q params]
-   (query es-conn index-name q nil params)))
+  ([conn index-name q opts]
+   (query conn index-name q nil opts)))
 
 (s/defn search-docs
   "Search for documents on ES using a query string search.  Also applies a filter map, converting
    the values in the all-of into must match terms."
-  [es-conn :- ESConn
+  [conn :- ESConn
    index-name :- (s/maybe s/Str)
    es-query :- (s/maybe ESQuery)
    all-of :- (s/maybe {s/Any s/Any})
-   params :- s/Any]
+   opts :- s/Any]
   (let [bool-query (q/filter-map->terms-query all-of es-query)]
-    (query es-conn index-name bool-query params)))
+    (query conn index-name bool-query opts)))

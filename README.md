@@ -16,7 +16,67 @@ It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited sup
                          :port 9200
                          :version 7
                          :protocol :http
-                         :timeout 20000}))
+                         :timeout 20000
+                         :auth {:type :api-key
+                                :params {:id "ngkvLnYB4ZehGW1qU-Xz"
+                                         :api-key "6HMnACPRSVWSMvZCf9VcGg"}}}))
+```
+
+Only `host` and `port` are required. The default values for the optional fields are:
+- `version`: `7`.
+- `protocol`: `:http`.
+- `timeout`: `30000.` 
+- `auth`: none.
+
+#### Authentication
+
+Here is the schema of the `auth` values:
+```clojure
+(s/defschema AuthParams
+  {:type (s/enum :basic-auth :api-key :oauth-token :bearer :headers)
+   :params {s/Keyword s/Str}})
+```
+
+The `type` field specifies the auth method and the `params` contains the authentication parameters.
+Here are some examples for each `type` value:
+
+* Authorization headers
+
+``` clojure
+{:type :headers
+ :params {:authorization "ApiKey bmdrdkxuWUI0WmVoR1cxcVUtWHo6NkhNbkFDUFJTVldTTXZaQ2Y5VmNHZw=="}}
+```
+
+* API Key
+
+``` clojure
+{:type :api-key
+ :params {:id "ngkvLnYB4ZehGW1qU-Xz"
+          :api-key "6HMnACPRSVWSMvZCf9VcGg"}}
+```
+
+* Basic Auth
+
+``` clojure
+{:type :basic-auth
+:params {:user "the-login" :pwd "the-pwd"}}
+```
+
+* OAuth token
+
+``` clojure
+{:type :oauth-token
+:params {:token "any-token"}}
+```
+
+* Bearer OAuth token
+
+Like Oauth token but prefixes the token with `Bearer ` if missing.
+
+``` clojure  
+{:type :bearer
+ :params {:token "any-token"}}
+
 ```
 
 Only `host` and `port` are required, the default version value is 7, the default protocol value is `:http`, and the default timeout is 30000 ms. 

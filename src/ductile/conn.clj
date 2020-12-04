@@ -1,8 +1,8 @@
 (ns ductile.conn
   (:require [clj-http.client :as client]
-            [clj-http.conn-mgr :refer [make-reusable-conn-manager
-                                       shutdown-manager]]
+            [clj-http.conn-mgr :refer [make-reusable-conn-manager shutdown-manager]]
             [clojure.tools.logging :as log]
+            [ductile.auth :as auth]
             [ductile.schemas :refer [ConnectParams ESConn]]
             [schema.core :as s]))
 
@@ -18,40 +18,43 @@
    :content-type :json
    :throw-exceptions false})
 
-(defn make-http-opts
-  ([cm
-    opts
-    query-params-keys
-    form-params
-    body]
+(s/defn make-http-opts :- (s/pred map?)
+  ([{:keys [cm auth]} :- (s/maybe ESConn)
+    opts :- (s/pred map?)
+    query-params-keys :- (s/maybe (s/pred coll?))
+    form-params :- (s/maybe (s/pred map?))
+    body :- s/Any]
    (cond-> default-opts
+     auth (into auth)
      body (assoc :body body)
      form-params (assoc :form-params form-params)
      cm (assoc :connection-manager cm)
      (seq query-params-keys) (assoc :query-params
-                                     (select-keys opts query-params-keys))))
-  ([cm opts query-params-keys] (make-http-opts cm opts query-params-keys nil nil))
-  ([cm] (make-http-opts cm {} [] nil nil)))
+                                    (select-keys opts query-params-keys))))
+  ([conn opts query-params-keys] (make-http-opts conn opts query-params-keys nil nil))
+  ([conn opts] (make-http-opts conn opts [] nil nil)))
 
 (defn make-connection-manager [cm-options]
   (make-reusable-conn-manager cm-options))
 
 (s/defn connect :- ESConn
-  "Instantiate an ES conn from props.
+  "Instantiate an ES conn from ConnectParams props.
   
   To intercept all ES HTTP requests, set :request-fn
   to function with the same interface as the 1-argument
   arity of `clj-http.client/request`."
-  [{:keys [protocol host port timeout version request-fn]
+  [{:keys [protocol host port timeout version auth request-fn]
     :or {protocol :http
          request-fn client/request
          timeout default-timeout
          version 7}} :- ConnectParams]
-  {:cm (make-connection-manager
-         (cm-options {:timeout timeout}))
-   :request-fn request-fn
-   :uri (format "%s://%s:%s" (name protocol) host port)
-   :version version})
+  (let [conn {:cm (make-connection-manager
+                   (cm-options {:timeout timeout}))
+              :request-fn request-fn
+              :uri (format "%s://%s:%s" (name protocol) host port)
+              :version version}]
+    (cond-> conn
+      auth (assoc :auth (auth/http-options auth)))))
 
 (s/defn close [conn :- ESConn]
   (-> conn :cm shutdown-manager))

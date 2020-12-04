@@ -10,13 +10,30 @@
   arity of clj-http.client/request."
   (s/=> s/Any (s/named s/Any 'req)))
 
+(s/defschema ApiKey
+  {:id s/Str
+   :api-key s/Str})
+
+(s/defschema BasicAuth
+  {:user s/Str
+   :pwd s/Str})
+
+(s/defschema OAuthToken
+  {:token s/Str})
+
+(s/defschema AuthParams
+  {:type (s/enum :basic-auth :api-key :oauth-token :bearer :headers)
+   :params {s/Keyword s/Str}})
+
 (s/defschema ConnectParams
   (st/open-schema
    {:host s/Str
     :port s/Int
     (s/optional-key :protocol) (s/enum :http :https)
+    (s/optional-key :authorization) s/Str
     (s/optional-key :version) s/Int
     (s/optional-key :timeout) s/Int
+    (s/optional-key :auth) AuthParams
     (s/optional-key :request-fn) RequestFn}))
 
 (s/defschema ESConn
@@ -26,7 +43,8 @@
                  PoolingHttpClientConnectionManager)
    :uri s/Str
    :version s/Int
-   :request-fn RequestFn})
+   :request-fn RequestFn
+   (s/optional-key :auth) (s/pred map?)})
 
 (s/defschema Refresh
   "ES refresh parameter, see
