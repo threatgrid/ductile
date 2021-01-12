@@ -2,9 +2,17 @@
   (:require [clojure.test :refer [testing]]
             [ductile.conn :as es-conn]))
 
-(def auth-opts
+(def basic-auth-opts
   {:type :basic-auth
    :params {:user "elastic" :pwd "ductile"}})
+
+(defn connect
+  [version auth-opts]
+  (cond-> {:host "localhost"
+           :port (+ 9200 version)
+           :version version}
+    (seq auth-opts) (assoc :auth auth-opts)
+    :finally es-conn/connect))
 
 (defmacro for-each-es-version [msg clean & body]
   "for each ES version:
@@ -14,10 +22,7 @@
 - call `clean` fn if not `nil` before and after body."
   {:style/indent 2}
   `(doseq [~'version [5 7]]
-     (let [~'conn (es-conn/connect {:host "localhost"
-                                    :port (+ 9200 ~'version)
-                                    :version ~'version
-                                    :auth auth-opts})
+     (let [~'conn (connect ~'version basic-auth-opts)
            clean-fn# ~clean]
        (try
          (testing (format "%s (ES version: %s)" ~msg  ~'version)

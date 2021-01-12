@@ -65,12 +65,16 @@
     200 body
     201 body
     404 nil
-    400 (do (log/warn "ES query parsing error:" res)
-            (throw (ex-info "ES query parsing error"
-                            {:type ::es-query-parsing-error
+    401 (do (log/warn "Unauthorized ES Request:" res)
+            (throw (ex-info "Unauthorized ES Request"
+                            {:type ::unauthorized
                              :es-http-res res})))
-    (do (log/warn "ES query failed:" res)
-        (throw (ex-info "ES query failed"
+    400 (do (log/warn "ES Invalid Request:" res)
+            (throw (ex-info "ES query parsing error"
+                            {:type ::invalid-request
+                             :es-http-res res})))
+    (do (log/warn "ES Unknow Error:" res)
+        (throw (ex-info "ES Unknown Error"
                         {:type ::es-unknown-error
                          :es-http-res res})))))
 

@@ -163,13 +163,14 @@
 
 (s/defn refresh!
   "refresh an index"
-  [{:keys [uri request-fn] :as conn} :- ESConn
+  ([es-conn] (refresh! es-conn nil))
+  ([{:keys [uri request-fn] :as conn} :- ESConn
    index-name :- (s/maybe s/Str)]
-  (-> (make-http-opts conn {})
-      (assoc :method :post
-             :url (refresh-uri uri index-name))
-      request-fn
-      safe-es-read))
+   (-> (make-http-opts conn {})
+       (assoc :method :post
+              :url (refresh-uri uri index-name))
+       request-fn
+       safe-es-read)))
 
 (s/defn open!
   "open an index"
@@ -193,25 +194,27 @@
 
 (s/defn rollover!
   "run a rollover query on an alias with given conditions"
-  [{:keys [uri request-fn] :as conn} :- ESConn
-   alias :- s/Str
-   conditions :- RolloverConditions
-   {:keys [dry_run
-           new-index-settings
-           new-index-name]} :- (st/open-schema
-                                (st/optional-keys
-                                 {:new-index-settings (s/pred map?)
-                                  :new-index-name (s/maybe s/Str)
-                                  :dry_run s/Bool}))]
-  (let [url (rollover-uri uri alias new-index-name dry_run)
-        rollover-params (cond-> {:conditions conditions}
-                          new-index-settings (assoc :settings new-index-settings))]
-    (-> (make-http-opts conn
-                        {}
-                        []
-                        rollover-params
-                        nil)
-        (assoc :method :post
-               :url url)
-        request-fn
-        safe-es-read)))
+  ([es-conn alias conditions]
+   (rollover! es-conn alias conditions {}))
+  ([{:keys [uri request-fn] :as conn} :- ESConn
+    alias :- s/Str
+    conditions :- RolloverConditions
+    {:keys [dry_run
+            new-index-settings
+            new-index-name]} :- (st/open-schema
+                                 (st/optional-keys
+                                  {:new-index-settings (s/pred map?)
+                                   :new-index-name (s/maybe s/Str)
+                                   :dry_run s/Bool}))]
+   (let [url (rollover-uri uri alias new-index-name dry_run)
+         rollover-params (cond-> {:conditions conditions}
+                           new-index-settings (assoc :settings new-index-settings))]
+     (-> (make-http-opts conn
+                         {}
+                         []
+                         rollover-params
+                         nil)
+         (assoc :method :post
+                :url url)
+         request-fn
+         safe-es-read))))
