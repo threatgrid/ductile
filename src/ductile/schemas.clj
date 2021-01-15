@@ -97,3 +97,13 @@
    {:max_age s/Str
     :max_docs s/Int
     :max_size s/Str}))
+
+(s/defschema CatIndices
+  [(st/open-schema
+    {:index s/Str
+     :status s/Str
+     :health s/Str
+     :pri s/Int
+     :rep s/Int
+     :docs.count s/Int
+     :docs.deleted s/Int})])

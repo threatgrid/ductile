@@ -356,7 +356,7 @@
 
 (s/defn count-docs
   "Count documents on ES matching given query."
-  [{:keys [uri request-fn] :as conn} :- ESConn
+  ([{:keys [uri request-fn] :as conn} :- ESConn
     index-name :- s/Str
     query :- (s/maybe ESQuery)]
    (-> (conn/make-http-opts conn
@@ -370,6 +370,9 @@
        request-fn
        conn/safe-es-read
        :count))
+  ([es-conn :- ESConn
+    index-name :- s/Str]
+   (count-docs es-conn index-name nil)))
 
 (defn ^:private result-data
   [res full-hits?]

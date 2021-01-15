@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [get])
   (:require [cemerick.uri :as uri]
             [ductile.conn :refer [make-http-opts safe-es-read]]
-            [ductile.schemas :refer [ESConn RolloverConditions]]
+            [ductile.schemas :refer [ESConn RolloverConditions CatIndices]]
             [schema.core :as s]
             [schema-tools.core :as st]))
 
@@ -218,3 +218,23 @@
                 :url url)
          request-fn
          safe-es-read))))
+
+(defn ^:private format-cat
+  [cat-res]
+  (map #(-> %
+            (update :docs.count read-string)
+            (update :docs.deleted read-string)
+            (update :pri read-string)
+            (update :rep read-string))
+       cat-res))
+
+(s/defn cat-indices :- (s/maybe CatIndices)
+  "perform a _cat/indices request"
+  [{:keys [uri request-fn] :as conn} :- ESConn]
+  (let [url (str uri "/_cat/indices?format=json&pretty=true&v=true")]
+    (-> (make-http-opts conn {})
+        (assoc :method :get
+               :url url)
+        request-fn
+        safe-es-read
+        format-cat)))

@@ -224,3 +224,21 @@
             (sut/delete-template! conn template-name-2)))
      (is (nil? (sut/get-template conn template-name-1)))
      (is (nil? (sut/get-template conn template-name-2))))))
+
+(deftest cat-indices-test
+  (for-each-es-version
+   "cat-indices shall properly return indices data"
+   #(sut/delete! conn "*")
+   (let [indices-names (->> (rand-int 10)
+                            inc
+                            range
+                            (map #(str "indexname" %)))]
+     (doseq [indexname indices-names]
+       (sut/create! conn indexname {}))
+     (let [cat-res (sut/cat-indices conn)]
+       (clojure.pprint/pprint cat-res)
+       (is (= (count indices-names)
+              (count cat-res)))
+       (is (= (set indices-names)
+              (set (map :index cat-res))))
+       (is (every? zero? (map :docs.count cat-res)))))))
