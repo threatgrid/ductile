@@ -2,7 +2,7 @@
 
 A minimalist clojure library for Elasticsearch REST API.
 
-It's currently compatible with Elasticsearch 7.X
+It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited support to prior Elasticsearch version (5 and 6) through a compatibility mode that is more intended to help migrating data.
 
 ## Usage
 
@@ -14,11 +14,73 @@ It's currently compatible with Elasticsearch 7.X
 
 (def c (es-conn/connect {:host "localhost"
                          :port 9200
+                         :version 7
                          :protocol :http
-                         :timeout 20000}))
+                         :timeout 20000
+                         :auth {:type :api-key
+                                :params {:id "ngkvLnYB4ZehGW1qU-Xz"
+                                         :api-key "6HMnACPRSVWSMvZCf9VcGg"}}}))
 ```
 
-Only `host` and `port` are required, the default protocol value is `:http` and the default timeout is 30000 ms.
+Only `host` and `port` are required. The default values for the optional fields are:
+- `version`: `7`.
+- `protocol`: `:http`.
+- `timeout`: `30000.` 
+- `auth`: none.
+
+#### Authentication
+
+Here is the schema of the `auth` values:
+```clojure
+(s/defschema AuthParams
+  {:type (s/enum :basic-auth :api-key :oauth-token :bearer :headers)
+   :params {s/Keyword s/Str}})
+```
+
+The `type` field specifies the auth method and the `params` contains the authentication parameters.
+Here are some examples for each `type` value:
+
+* Authorization headers
+
+``` clojure
+{:type :headers
+ :params {:authorization "ApiKey bmdrdkxuWUI0WmVoR1cxcVUtWHo6NkhNbkFDUFJTVldTTXZaQ2Y5VmNHZw=="}}
+```
+
+* API Key
+
+``` clojure
+{:type :api-key
+ :params {:id "ngkvLnYB4ZehGW1qU-Xz"
+          :api-key "6HMnACPRSVWSMvZCf9VcGg"}}
+```
+
+* Basic Auth
+
+``` clojure
+{:type :basic-auth
+:params {:user "the-login" :pwd "the-pwd"}}
+```
+
+* OAuth token
+
+``` clojure
+{:type :oauth-token
+:params {:token "any-token"}}
+```
+
+* Bearer OAuth token
+
+Like Oauth token but prefixes the token with `Bearer ` if missing.
+
+``` clojure  
+{:type :bearer
+ :params {:token "any-token"}}
+
+```
+
+Only `host` and `port` are required, the default version value is 7, the default protocol value is `:http`, and the default timeout is 30000 ms. 
+The `version` field accepts an integer value to specify the major Elasticsearch version, and is used for the compatibility mode with Elasticsearch 5.x and 6.x.
 
 ### index operations
 
@@ -35,6 +97,7 @@ Only `host` and `port` are required, the default protocol value is `:http` and t
                                           :age {:type :long}
                                           :description {:type :text}}}
                   :aliases {:test-alias {}}})
+;; for Elasticsearch 5.x compatibility, you must specify the document type(s) in the mappings.
 
 (es-index/create! c "test-index" test-config)
 
@@ -221,6 +284,21 @@ it returns the patched document
  
 ```
 
+* Elasticsearch 5.x compatibility
+
+Any of the previous functions can be used on an Elasticsearch 5.x cluster by specifying the document type as a supplementary parameter after the index name. 
+
+```clojure
+(es-doc/get-doc c
+                "test-index"
+                "test-type"
+                1
+                {})
+```
+```javascript
+{:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}
+```
+
 ### and of course you can query it!
 you can either provide classical elasticsearch queries or use some helpers from `ductile.query` namespace
 
@@ -279,6 +357,43 @@ Ductile also provides a search function with a simple interface that offers to u
                     {:age 36}
                     {:sort {:name {:order :desc}}})
 ```
+
+### Test stubbing
+
+To stub ES calls, provide a custom `:request-fn` to `es-conn/connect`.
+It should implement the same interface as the 1-argument version
+of `clj-http.client/request`.
+
+```clojure
+(require '[ductile.conn :as es-conn]
+         '[clj-http.client :as client])
+
+(def c (es-conn/connect {:host "localhost"
+                         :port 9200
+                         :request-fn (fn [req]
+                                       {:status 200
+                                        :headers {:content-type "application/clojure"}})}))
+```
+
+See the middleware provided by `clj-http.client/wrap-*` for simulating more interesting cases.
+For example, this intercepts query-params and prints them:
+
+```clojure
+(require '[ductile.conn :as es-conn]
+         '[ring.util.codec :refer [form-decode]]
+         '[clojure.walk :refer [keywordize-keys]]
+         '[clj-http.client :as client])
+
+(def c (es-conn/connect {:host "localhost"
+                         :port 9200
+                         :request-fn
+                         (-> (fn [req]
+                               (prn {:query-params (keywordize-keys (form-decode (:query-string req)))})
+                               {:status 200
+                                :headers {:content-type "application/clojure"}})
+                             client/wrap-query-params)}))
+```
+
 
 
 ## License

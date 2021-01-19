@@ -1,7 +1,13 @@
-elasticsearch-dev:
-  image: elasticsearch:5.6.9
-  environment:
-    - cluster.name=elasticsearch5
-  ports:
-    - "9205:9200"
-    - "9305:9300"
+
+version: '3'
+services:
+  elasticsearch-dev:
+    image: elasticsearch:5.6.9
+    environment:
+      - cluster.name=elasticsearch5
+      - discovery.type=single-node
+      # - xpack.security.enabled=true # this requires a licence on ES5
+      - ELASTIC_PASSWORD=ductile
+    ports:
+      - "9205:9200"
+      - "9305:9300"

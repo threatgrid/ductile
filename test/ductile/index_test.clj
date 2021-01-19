@@ -1,12 +1,10 @@
 (ns ductile.index-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
-            [ductile
-             [test-helpers :refer [for-each-es-version]]
-             [index :as sut]
-             [conn :as es-conn]
-             [document :as es-doc]]
+            [ductile.document :as es-doc]
+            [ductile.index :as sut]
+            [ductile.test-helpers :refer [for-each-es-version]]
             [schema.test :refer [validate-schemas]])
-  (:import [java.util UUID]))
+  (:import java.util.UUID))
 
 (use-fixtures :once validate-schemas)
 
@@ -62,14 +60,14 @@
            updated-mappings (assoc-in base-mappings
                                       (remove nil? [doc-type :properties :email :type])
                                       "keyword")
-           index-update-mappings-res (sut/update-mappings! conn
-                                                           indexname
-                                                           (some-> doc-type name)
-                                                           updated-mappings)
+           _ (sut/update-mappings! conn
+                                   indexname
+                                   (some-> doc-type name)
+                                   updated-mappings)
            updated-settings (assoc base-settings :number_of_replicas "2")
-           index-update-settings-res (sut/update-settings! conn
-                                                           indexname
-                                                           {:number_of_replicas 2})
+           _ (sut/update-settings! conn
+                                   indexname
+                                   {:number_of_replicas 2})
            index-get-res (sut/get conn indexname)
            index-close-res (sut/close! conn indexname)
            index-open-res (sut/open! conn indexname)
@@ -84,10 +82,10 @@
                                :provided_name indexname)}}}
               (update-in index-get-res
                          [indexkw :settings :index]
-                         dissoc
-                         :creation_date
-                         :uuid
-                         :version)))
+                         select-keys
+                         [:number_of_shards
+                          :number_of_replicas
+                          :provided_name])))
        (is (= (cond-> {:acknowledged true}
                 (< 5 version) (assoc :shards_acknowledged true))
               index-open-res))
@@ -114,7 +112,7 @@
                    :aliases {aliaskw {}}})
      (testing "rollover should not be applied if conditions are not matched"
        (let [{:keys [rolled_over dry_run new_index]}
-             (sut/rollover! conn aliasname {:max_age "1d" :max_docs 3})]
+             (sut/rollover! conn aliasname {:max_age "1d" :max_docs 3} {})]
          (is (false? rolled_over))
          (is (false? dry_run))
          (is (false? (sut/index-exists? conn new_index)))))
@@ -123,9 +121,7 @@
             (-> (sut/rollover! conn
                                aliasname
                                {:max_age "1d" :max_docs 3}
-                               {}
-                               nil
-                               true)
+                               {:dry_run true})
                 (select-keys [:rolled_over :dry_run])))
          "rollover dry_run paramater should be properly applied")
 
@@ -141,9 +137,7 @@
              (sut/rollover! conn
                             aliasname
                             {:max_age "1d" :max_docs 3}
-                            {}
-                            nil
-                            true)]
+                            {:dry_run true})]
          (is (false? rolled_over))
          (is dry_run)
          (is (= old_index indexname1))
@@ -154,9 +148,8 @@
             (:new_index (sut/rollover! conn
                                        aliasname
                                        {:max_age "1d" :max_docs 3}
-                                       {}
-                                       new-indexname
-                                       true)))
+                                       {:new-index-name new-indexname
+                                        :dry_run true})))
          "new_index should be equal to the name passed as parameter")
 
      (testing "rollover should be properly applied when condition is met and dry run set to false"
@@ -164,10 +157,9 @@
              (sut/rollover! conn
                             aliasname
                             {:max_age "1d" :max_docs 3}
-                            {:number_of_shards 2
-                             :number_of_replicas 3}
-                            nil
-                            false)
+                            {:new-index-settings {:number_of_shards 2
+                                                  :number_of_replicas 3}
+                             :dry_run false})
              {:keys [number_of_shards
                      number_of_replicas]} (get-in (sut/get conn new_index)
                                                   [(keyword new_index) :settings :index])]
@@ -232,3 +224,21 @@
             (sut/delete-template! conn template-name-2)))
      (is (nil? (sut/get-template conn template-name-1)))
      (is (nil? (sut/get-template conn template-name-2))))))
+
+(deftest cat-indices-test
+  (for-each-es-version
+   "cat-indices shall properly return indices data"
+   #(sut/delete! conn "*")
+   (let [indices-names (->> (rand-int 10)
+                            inc
+                            range
+                            (map #(str "indexname" %)))]
+     (doseq [indexname indices-names]
+       (sut/create! conn indexname {}))
+     (let [cat-res (sut/cat-indices conn)]
+       (clojure.pprint/pprint cat-res)
+       (is (= (count indices-names)
+              (count cat-res)))
+       (is (= (set indices-names)
+              (set (map :index cat-res))))
+       (is (every? zero? (map :docs.count cat-res)))))))
