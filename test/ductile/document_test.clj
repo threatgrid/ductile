@@ -159,10 +159,11 @@
                        :test_value 42}
            doc-type (if (= version 5) "test-type" "_doc")
            sample-docs
-           (repeatedly 10 #(hash-map :id (str (UUID/randomUUID))
-                                     :_index indexname
-                                     :bar "foo"
-                                     :_type doc-type))
+           (repeatedly 10
+                       #(hash-map :id (str (UUID/randomUUID))
+                                  :_index indexname
+                                  :bar "foo"
+                                  :_type doc-type))
            get-doc (fn [doc-id opts]
                      (sut/get-doc conn indexname doc-type doc-id opts))
            get-sample-doc #(get-doc (:id sample-doc) {})
@@ -241,26 +242,6 @@
              ;; restore with the initial values
              (index-doc sample-doc
                         {:refresh "true"}))))
-       (testing "bulk-create-doc"
-         (is (= sample-docs
-                (sut/bulk-create-doc conn
-                                     sample-docs
-                                     {:refresh "true"})))
-         (testing "with partioning"
-           (let [sample-docs-2 (map #(assoc % :test_value 43) sample-docs)]
-             (is (= sample-docs-2
-                    (sut/bulk-create-doc conn
-                                         sample-docs-2
-                                         {:refresh "true"}
-                                         0)))
-             (is (= 10
-                    (get-in (sut/search-docs conn
-                                             indexname
-                                             {:query_string {:query "*"}}
-                                             {:test_value 43}
-                                             {:sort_by "test_value"
-                                              :sort_order :desc})
-                            [:paging :total-hits]))))))
        (is (= {:data #{sample-doc (dissoc sample-doc :id)}
                :paging {:total-hits 2
                         :sort [42]}}
@@ -283,6 +264,116 @@
        (is (true?
             (delete-doc (:id sample-doc)
                         {:refresh "true"})))))))
+
+(defn partition-all-2
+  [coll]
+  (partition-all (quot (count coll) 2) coll))
+
+(deftest ^:integration bulk-ops
+  (let [indexname (str "test_index" (UUID/randomUUID))]
+    (for-each-es-version
+     "all ES Document Bulk operations"
+     #(es-index/delete! conn indexname)
+     (let [doc-type (if (= version 5) "test-type" "_doc")
+           nb-sample-docs 100
+           sample-docs (->> (repeatedly nb-sample-docs
+                                        #(hash-map :id (str (UUID/randomUUID))
+                                                   :_index indexname
+                                                   :bar "foo"
+                                                   :_type doc-type))
+                            (map #(assoc % :_id (:id %))))
+           [to-create-docs to-index-docs] (partition-all-2 sample-docs)
+           [to-update-docs to-delete-docs] (partition-all-2 (shuffle sample-docs))
+           prepared-update-docs (map #(assoc % :title "updated") to-update-docs)
+           check-fn (fn [bulk-fn action action-docs filter-map]
+                      (testing (format "bulk-%1$s-docs shall properly %1$s documents" (name action))
+                        (let [action-filter (if (= :delete action)
+                                              {}
+                                              {:action (name action)})
+                              prepared-docs (map #(into % action-filter) action-docs)
+                              bulk-res (-> (bulk-fn conn
+                                                    prepared-docs
+                                                    {:refresh "true"})
+                                           first
+                                           :items)
+                              expected-result-label (case action
+                                             :create "created"
+                                             :update "updated"
+                                             :index "created"
+                                             :delete "deleted")
+                              expected-search-count (cond->> (count action-docs)
+                                                      (= action :delete) (- (count sample-docs)))]
+                          (is (= (count bulk-res) (count action-docs)))
+                          (is (every? #(= (get-in % [action :result])
+                                          expected-result-label)
+                                      bulk-res))
+                          (is (= expected-search-count
+                                 (get-in
+                                  (sut/search-docs conn
+                                                   indexname
+                                                   {:match_all {}}
+                                                   (into filter-map action-filter)
+                                                   {})
+                                  [:paging :total-hits]))))))]
+       (check-fn sut/bulk-create-docs
+                 :create
+                 to-create-docs
+                 {})
+       (check-fn sut/bulk-index-docs
+                 :index
+                 to-index-docs
+                 {})
+       (check-fn sut/bulk-update-docs
+                 :update
+                 prepared-update-docs
+                 {:title "updated"})
+       (check-fn sut/bulk-delete-docs
+                 :delete
+                 to-delete-docs
+                 {})
+       (testing "delete docs without partitioning"
+         (is (->> (sut/bulk-delete-docs conn
+                                        to-delete-docs
+                                        {:refresh "true"})
+                  :items
+                  (every? #(= "deleted" (:result %)))))
+         (is (= (set (map :id to-update-docs))
+                (->> (sut/search-docs conn
+                                      indexname
+                                      {:query_string {:query "*"}}
+                                      {:bar "foo"}
+                                      {})
+                     :data
+                     (map :id)
+                     set))))
+       (testing "bulk-post shall properly submit different action types in a single post"
+         ;; delete/update remaining docs, recreate deleted ones
+         (let [[remaining-to-update remaining-to-delete] (partition-all-2 to-update-docs)
+               prepared-update-docs (map #(assoc % :title "reupdated") remaining-to-update)
+               [to-recreate-docs to-reindex-docs] (partition-all (quot (count to-delete-docs) 2)
+                                                                 to-delete-docs)
+               bulk-actions {:create to-recreate-docs
+                             :index to-reindex-docs
+                             :update prepared-update-docs
+                             :delete remaining-to-delete}
+               grouped-res (->> (sut/bulk conn bulk-actions {:refresh "true"})
+                                :items
+                                (group-by key))
+               check-fn (fn [action filter-map]
+                          (testing (format "bulk shall properly handle %s actions" action)
+                            (let [expected-docs (get grouped-res action)]
+                              (is (= (count expected-docs)
+                                     (get-in
+                                      (sut/search-docs conn
+                                                       indexname
+                                                       {:ids {:values (map :_id expected-docs)}}
+                                                       filter-map
+                                                       {})
+                                      [:paging :total-hits]))))))]
+           (check-fn :create {})
+           (check-fn :index {})
+           (check-fn :update {:title "reupdated"})
+           (check-fn :delete {})))))))
 
 (deftest ^:integration search_after-consistency-test
   (let [indexname (str "test_index" (UUID/randomUUID))]
@@ -329,7 +420,7 @@
                              (range 10))]
        (es-index/delete! conn indexname)
        (es-index/create! conn indexname {})
-       (sut/bulk-create-doc conn
+       (sut/bulk-create-docs conn
                             sample-docs
                             {:refresh "true"})
        (is (= 10
@@ -357,7 +448,7 @@
            sample-3-ids (map :_id sample-3-docs)
            _ (es-index/delete! conn indexname)
            _ (es-index/create! conn indexname {})
-           _ (sut/bulk-create-doc conn sample-docs {:refresh "true"})
+           _ (sut/bulk-create-docs conn sample-docs {:refresh "true"})
            ids-query-result-1 (sut/query conn
                                          indexname
                                          (query/ids sample-3-ids)
@@ -494,8 +585,8 @@
            q-ids-2 (query/ids ["3" "4"])]
        (es-index/delete! conn indexname)
        (es-index/create! conn indexname {})
-       (sut/bulk-create-doc conn sample-docs-1 {:refresh "true"})
-       (sut/bulk-create-doc conn sample-docs-2 {:refresh "true"})
+       (sut/bulk-create-docs conn sample-docs-1 {:refresh "true"})
+       (sut/bulk-create-docs conn sample-docs-2 {:refresh "true"})
        (is (= 5
               (:deleted (sut/delete-by-query conn
                                              [indexname1]

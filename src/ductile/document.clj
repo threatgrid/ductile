@@ -7,7 +7,8 @@
             [ductile.pagination :as pagination]
             [ductile.query :as q]
             [ductile.schemas :refer [CRUDOptions ESAggs ESConn ESQuery]]
-            [schema.core :as s]))
+            [schema.core :as s]
+            [schema-tools.core :as st]))
 
 (def default-limit 1000)
 (def default-retry-on-conflict 5)
@@ -80,17 +81,168 @@
    :_version
    :_version_type])
 
-(defn index-operation
-  "helper to prepare a bulk insert operation"
-  [doc]
-  {"index" (select-keys doc special-operation-keys)})
+(defn byte-size
+  "Count the size of the given string in bytes."
+  [^String s]
+  (when s
+    (count (.getBytes s))))
 
-(defn bulk-index
-  "generates the content for a bulk insert operation"
-  ([documents]
-   (let [operations (map index-operation documents)
-         documents  (map #(apply dissoc % special-operation-keys) documents)]
-     (map vector operations documents))))
+(defn format-bulk-doc-fn
+  "helper to prepare a bulk operation"
+  [op-type]
+  (fn [doc]
+    {op-type (select-keys doc special-operation-keys)}))
+
+(defn format-bulk-docs
+  "generates the content for a bulk operation"
+  [op-type documents]
+  (let [format-doc (format-bulk-doc-fn op-type)
+        operations (map format-doc documents)
+        documents  (map #(apply dissoc % special-operation-keys) documents)]
+    (case op-type
+      :delete [operations]
+      :update (map vector
+                   operations
+                   (map #(array-map :doc %)
+                        documents))
+      (map vector operations documents))))
+
+(defn partition-json-ops
+  "Return a lazy sequence of lists of ops whose size is less than max-size.
+   If a json-op exceeds the max size, it is included in a list of one element."
+  [json-ops max-size]
+  (let [ops-with-size (map (fn [op]
+                             [(byte-size op) op])
+                           json-ops) ;; [[12 op1] [53 op2] ...]
+        groups (reduce (fn [acc [size op]]
+                         (let [[[size-group group] & xs] acc
+                               new-size (+ size-group size)]
+                           ;; Can the new element be appended to
+                           ;; the current group ?
+                           ;; add at least one element
+                           (if (or (empty? group)
+                                   (<= new-size max-size))
+                             (cons [new-size (conj group op)] xs)
+                             (cons [size [op]] acc))))
+                       [[0 []]] ;; initial group
+                       ops-with-size)]
+    (reverse (map second groups))))
+
+(defn ^:private bulk-post-docs
+  [json-ops
+   {:keys [uri request-fn] :as conn}
+   opts]
+  (let [bulk-body (-> json-ops
+                      (interleave (repeat "\n"))
+                      string/join)]
+    (-> (conn/make-http-opts conn
+                             opts
+                             [:refresh]
+                             nil
+                             bulk-body)
+        (assoc :method :post
+               :url (bulk-uri uri))
+        request-fn
+        conn/safe-es-read
+        conn/safe-es-bulk-read)))
+
+(s/defschema BulkOps
+  (s/enum :create :index :update :delete))
+
+(s/defschema BulkActions
+  {BulkOps [(s/pred map?)]})
+
+(s/defn bulk
+  "Bulk actions on ES"
+  ([conn :- ESConn
+    actions :- BulkActions
+    opts :- CRUDOptions]
+   (bulk conn actions opts nil))
+  ([{:keys [version] :as conn} :- ESConn
+    actions :- BulkActions
+    opts :- CRUDOptions
+    max-size :- (s/maybe s/Int)]
+   (let [ops (mapcat
+              (fn [[op-type docs]]
+                (format-bulk-docs op-type
+                                  (cond->> docs
+                                    (= version 7) (map #(dissoc % :_type)))))
+              actions)
+         json-ops (map (fn [xs]
+                         (->> xs
+                              (map #(json/generate-string % {:pretty false}))
+                              (string/join "\n")))
+                       ops)
+         json-ops-groups (if max-size
+                           (partition-json-ops json-ops max-size)
+                           [json-ops])]
+     (doall
+      (map #(bulk-post-docs % conn opts)
+           json-ops-groups)))))
+
+(s/defn bulk-create-docs
+  "create multiple documents on ES"
+  ([conn :- ESConn
+    docs :- [(s/pred map?)]
+    opts :- CRUDOptions]
+   (bulk-create-docs conn docs opts nil))
+  ([conn :- ESConn
+    docs :- [s/Any]
+    opts :- CRUDOptions
+    max-size :- (s/maybe s/Int)]
+   (bulk conn
+         {:create docs}
+         opts
+         max-size)))
+
+(s/defn bulk-index-docs
+  "index multiple documents on ES"
+  ([conn :- ESConn
+    docs :- [(s/pred map?)]
+    opts :- CRUDOptions]
+   (bulk-index-docs conn docs opts nil))
+  ([conn :- ESConn
+    docs :- [s/Any]
+    opts :- CRUDOptions
+    max-size :- (s/maybe s/Int)]
+   (bulk conn
+         {:index docs}
+         opts
+         max-size)))
+
+(s/defn bulk-update-docs
+  "update multiple documents on ES"
+  ([conn :- ESConn
+    docs :- [(st/open-schema
+              {:_id s/Str
+               :_index s/Str})]
+    opts :- CRUDOptions]
+   (bulk-update-docs conn docs opts nil))
+  ([conn :- ESConn
+    docs :- [s/Any]
+    opts :- CRUDOptions
+    max-size :- (s/maybe s/Int)]
+   (bulk conn
+         {:update docs}
+         opts
+         max-size)))
+
+(s/defn bulk-delete-docs
+  "delete multiple documents on ES"
+  ([conn :- ESConn
+    docs :- [(st/open-schema
+              {:_id s/Str
+               :_index s/Str})]
+    opts :- CRUDOptions]
+   (bulk-delete-docs conn docs opts nil))
+  ([conn :- ESConn
+    docs :- [s/Any]
+    opts :- CRUDOptions
+    max-size :- (s/maybe s/Int)]
+   (bulk conn
+         {:delete docs}
+         opts
+         max-size)))
 
 (s/defn get-doc
   "get a document on es and return only the source"
@@ -168,75 +320,6 @@
                        doc-type
                        doc
                        (assoc opts :op_type "create"))))
-
-(defn byte-size
-  "Count the size of the given string in bytes."
-  [^String s]
-  (when s
-    (count (.getBytes s))))
-
-(defn partition-json-ops
-  "Return a lazy sequence of lists of ops whose size is less than max-size.
-   If a json-op exceeds the max size, it is included in a list of one element."
-  [json-ops max-size]
-  (let [ops-with-size (map (fn [op]
-                             [(byte-size op) op])
-                           json-ops) ;; [[12 op1] [53 op2] ...]
-        groups (reduce (fn [acc [size op]]
-                         (let [[[size-group group] & xs] acc
-                               new-size (+ size-group size)]
-                           ;; Can the new element be appended to
-                           ;; the current group ?
-                           ;; add at least one element
-                           (if (or (empty? group)
-                                   (<= new-size max-size))
-                             (cons [new-size (conj group op)] xs)
-                             (cons [size [op]] acc))))
-                       [[0 []]] ;; initial group
-                       ops-with-size)]
-    (reverse (map second groups))))
-
-(defn ^:private bulk-post-docs
-  [json-ops
-   {:keys [uri request-fn] :as conn}
-   opts]
-  (let [bulk-body (-> json-ops
-                      (interleave (repeat "\n"))
-                      string/join)]
-    (-> (conn/make-http-opts conn
-                             opts
-                             [:refresh]
-                             nil
-                             bulk-body)
-        (assoc :method :post
-               :url (bulk-uri uri))
-        request-fn
-        conn/safe-es-read
-        conn/safe-es-bulk-read)))
-
-(s/defn bulk-create-doc
-  "create multiple documents on ES and return the created documents"
-  ([conn :- ESConn
-    docs :- [s/Any]
-    opts :- CRUDOptions]
-   (bulk-create-doc conn docs opts nil))
-  ([{:keys [version] :as conn} :- ESConn
-    docs :- [s/Any]
-    opts :- CRUDOptions
-    max-size :- (s/maybe s/Int)]
-   (let [ops (bulk-index (cond->> docs
-                           (= version 7) (map #(dissoc % :_type))))
-         json-ops (map (fn [xs]
-                         (->> xs
-                              (map #(json/generate-string % {:pretty false}))
-                              (string/join "\n")))
-                       ops)
-         json-ops-groups (if max-size
-                           (partition-json-ops json-ops max-size)
-                           [json-ops])]
-     (doseq [json-ops-group json-ops-groups]
-       (bulk-post-docs json-ops-group conn opts))
-     docs)))
 
 (defn ^:private update-doc-raw
   [uri conn doc request-fn opts]
