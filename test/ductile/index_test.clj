@@ -126,7 +126,7 @@
          "rollover dry_run paramater should be properly applied")
 
      ;; add 3 documents to trigger max-doc condition
-     (es-doc/bulk-create-doc conn
+     (es-doc/bulk-index-docs conn
                              (repeat 3 (cond-> {:_index aliasname
                                                 :foo :bar}
                                          (= 5 version) (assoc :_type "doc_type")))
@@ -236,7 +236,6 @@
      (doseq [indexname indices-names]
        (sut/create! conn indexname {}))
      (let [cat-res (sut/cat-indices conn)]
-       (clojure.pprint/pprint cat-res)
        (is (= (count indices-names)
               (count cat-res)))
        (is (= (set indices-names)

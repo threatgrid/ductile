@@ -187,7 +187,7 @@
     opts :- CRUDOptions]
    (bulk-create-docs conn docs opts nil))
   ([conn :- ESConn
-    docs :- [s/Any]
+    docs :- [(s/pred map?)]
     opts :- CRUDOptions
     max-size :- (s/maybe s/Int)]
    (bulk conn
