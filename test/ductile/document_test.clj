@@ -294,13 +294,12 @@
                               bulk-res (-> (bulk-fn conn
                                                     prepared-docs
                                                     {:refresh "true"})
-                                           first
                                            :items)
                               expected-result-label (case action
-                                             :create "created"
-                                             :update "updated"
-                                             :index "created"
-                                             :delete "deleted")
+                                                        :create "created"
+                                                        :update "updated"
+                                                        :index "created"
+                                                        :delete "deleted")
                               expected-search-count (cond->> (count action-docs)
                                                       (= action :delete) (- (count sample-docs)))]
                           (is (= (count bulk-res) (count action-docs)))
@@ -331,21 +330,6 @@
                  :delete
                  to-delete-docs
                  {})
-       (testing "delete docs without partitioning"
-         (is (->> (sut/bulk-delete-docs conn
-                                        to-delete-docs
-                                        {:refresh "true"})
-                  :items
-                  (every? #(= "deleted" (:result %)))))
-         (is (= (set (map :id to-update-docs))
-                (->> (sut/search-docs conn
-                                      indexname
-                                      {:query_string {:query "*"}}
-                                      {:bar "foo"}
-                                      {})
-                     :data
-                     (map :id)
-                     set))))
        (testing "bulk-post shall properly submit different action types in a single post"
          ;; delete/update remaining docs, recreate deleted ones
          (let [[remaining-to-update remaining-to-delete] (partition-all-2 to-update-docs)
@@ -356,20 +340,20 @@
                              :index to-reindex-docs
                              :update prepared-update-docs
                              :delete remaining-to-delete}
-               grouped-res (->> (sut/bulk conn bulk-actions {:refresh "true"})
+               bulk-res (sut/bulk conn bulk-actions {:refresh "true"})
+               grouped-res (->> bulk-res
                                 :items
-                                (group-by key))
+                                (group-by ffirst))
                check-fn (fn [action filter-map]
                           (testing (format "bulk shall properly handle %s actions" action)
-                            (let [expected-docs (get grouped-res action)]
-                              (is (= (count expected-docs)
-                                     (get-in
-                                      (sut/search-docs conn
-                                                       indexname
-                                                       {:ids {:values (map :_id expected-docs)}}
-                                                       filter-map
-                                                       {})
-                                      [:paging :total-hits]))))))]
+                            (let [expected-ids (->> (mapcat vals
+                                                            (get grouped-res action))
+                                                    (map :_id))
+                                  ids-query (query/ids expected-ids)
+                                  q (query/filter-map->terms-query filter-map ids-query)]
+                              (assert (seq expected-ids))
+                              (is (= (if (= action :delete) 0 (count expected-ids))
+                                     (sut/count-docs conn indexname q))))))]
            (check-fn :create {})
            (check-fn :index {})
            (check-fn :update {:title "reupdated"})

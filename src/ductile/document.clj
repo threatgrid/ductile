@@ -152,6 +152,15 @@
 (s/defschema BulkActions
   {BulkOps [(s/pred map?)]})
 
+(defn format-bulk-res
+  [bulk-res-list]
+  (reduce (fn [res elem]
+            {:took (+ (:took res 0) (:took elem))
+             :errors (and (:errors res true) (:errors elem))
+             :items (concat (:items res) (:items elem))})
+          {}
+          bulk-res-list))
+
 (s/defn bulk
   "Bulk actions on ES"
   ([conn :- ESConn
@@ -175,10 +184,11 @@
                        ops)
          json-ops-groups (if max-size
                            (partition-json-ops json-ops max-size)
-                           [json-ops])]
-     (doall
-      (map #(bulk-post-docs % conn opts)
-           json-ops-groups)))))
+                           [json-ops])
+         bulk-res-list  (doall
+                         (map #(bulk-post-docs % conn opts)
+                              json-ops-groups))]
+     (format-bulk-res bulk-res-list))))
 
 (s/defn bulk-create-docs
   "create multiple documents on ES"
