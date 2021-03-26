@@ -154,12 +154,9 @@
 
 (defn format-bulk-res
   [bulk-res-list]
-  (reduce (fn [res elem]
-            {:took (+ (:took res 0) (:took elem))
-             :errors (and (:errors res true) (:errors elem))
-             :items (concat (:items res) (:items elem))})
-          {}
-          bulk-res-list))
+  {:took (apply + (map :took bulk-res-list))
+   :errors (some? (some (comp true? :errors) bulk-res-list))
+   :items (mapcat :items bulk-res-list)})
 
 (s/defn bulk
   "Bulk actions on ES"

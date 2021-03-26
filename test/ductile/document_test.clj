@@ -265,6 +265,76 @@
             (delete-doc (:id sample-doc)
                         {:refresh "true"})))))))
 
+(defn rand-bulk-response
+  [nb-items errors?]
+  {:took 3,
+   :errors errors?,
+   :items (take nb-items
+                [{:index
+                   {:_id "1",
+                    :_type "_doc",
+                    :_index "test",
+                    :_shards {:total 2, :successful 1, :failed 0},
+                    :_primary_term 1,
+                    :status 201,
+                    :result "created",
+                    :_version 1,
+                    :_seq_no 0}}
+                  {:delete
+                   {:_id "2",
+                    :_type "_doc",
+                    :_index "test",
+                    :_shards {:total 2, :successful 1, :failed 0},
+                    :_primary_term 2,
+                    :status 404,
+                    :result "not_found",
+                    :_version 1,
+                    :_seq_no 1}}
+                  {:create
+                   {:_id "3",
+                    :_type "_doc",
+                    :_index "test",
+                    :_shards {:total 2, :successful 1, :failed 0},
+                    :_primary_term 3,
+                    :status 201,
+                    :result "created",
+                    :_version 1,
+                    :_seq_no 2}}
+                  {:update
+                   {:_id "1",
+                    :_type "_doc",
+                    :_index "test",
+                    :_shards {:total 2, :successful 1, :failed 0},
+                    :_primary_term 4,
+                    :status 200,
+                    :result "updated",
+                    :_version 2,
+                    :_seq_no 3}}])})
+
+(deftest format-bulk-res-test
+  (let [bulk-res-errors (rand-bulk-response 2 true)
+        bulk-res-ok (rand-bulk-response 4 false)
+        check-fn (fn [{:keys [msg bulk-res-list nb-items errors?]}]
+                   (let [{:keys [took errors items]}
+                         (sut/format-bulk-res (shuffle bulk-res-list))]
+                     (is (= took (* 3 (count bulk-res-list))))
+                     (is (= errors? errors))
+                     (is (every? map? items))
+                     (is (= nb-items (count items)))))]
+    (check-fn {:msg "some errors"
+               :bulk-res-list (into (repeat 2 bulk-res-errors)
+                                    (repeat 4 bulk-res-ok))
+               :nb-items 20
+               :errors? true})
+    (check-fn {:msg "no errors"
+               :bulk-res-list (repeat 4 bulk-res-ok)
+               :nb-items 16
+               :errors? false})
+    (check-fn {:msg "only errors"
+               :bulk-res-list (repeat 4 bulk-res-errors)
+               :nb-items 8
+               :errors? true})))
+
 (defn partition-all-2
   [coll]
   (partition-all (quot (count coll) 2) coll))
