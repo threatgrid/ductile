@@ -265,6 +265,76 @@
             (delete-doc (:id sample-doc)
                         {:refresh "true"})))))))
 
+(defn rand-bulk-response
+  [nb-items errors?]
+  {:took 3,
+   :errors errors?,
+   :items (take nb-items
+                [{:index
+                   {:_id "1",
+                    :_type "_doc",
+                    :_index "test",
+                    :_shards {:total 2, :successful 1, :failed 0},
+                    :_primary_term 1,
+                    :status 201,
+                    :result "created",
+                    :_version 1,
+                    :_seq_no 0}}
+                  {:delete
+                   {:_id "2",
+                    :_type "_doc",
+                    :_index "test",
+                    :_shards {:total 2, :successful 1, :failed 0},
+                    :_primary_term 2,
+                    :status 404,
+                    :result "not_found",
+                    :_version 1,
+                    :_seq_no 1}}
+                  {:create
+                   {:_id "3",
+                    :_type "_doc",
+                    :_index "test",
+                    :_shards {:total 2, :successful 1, :failed 0},
+                    :_primary_term 3,
+                    :status 201,
+                    :result "created",
+                    :_version 1,
+                    :_seq_no 2}}
+                  {:update
+                   {:_id "1",
+                    :_type "_doc",
+                    :_index "test",
+                    :_shards {:total 2, :successful 1, :failed 0},
+                    :_primary_term 4,
+                    :status 200,
+                    :result "updated",
+                    :_version 2,
+                    :_seq_no 3}}])})
+
+(deftest format-bulk-res-test
+  (let [bulk-res-errors (rand-bulk-response 2 true)
+        bulk-res-ok (rand-bulk-response 4 false)
+        check-fn (fn [{:keys [msg bulk-res-list nb-items errors?]}]
+                   (let [{:keys [took errors items]}
+                         (sut/format-bulk-res (shuffle bulk-res-list))]
+                     (is (= took (* 3 (count bulk-res-list))))
+                     (is (= errors? errors))
+                     (is (every? map? items))
+                     (is (= nb-items (count items)))))]
+    (check-fn {:msg "some errors"
+               :bulk-res-list (into (repeat 2 bulk-res-errors)
+                                    (repeat 4 bulk-res-ok))
+               :nb-items 20
+               :errors? true})
+    (check-fn {:msg "no errors"
+               :bulk-res-list (repeat 4 bulk-res-ok)
+               :nb-items 16
+               :errors? false})
+    (check-fn {:msg "only errors"
+               :bulk-res-list (repeat 4 bulk-res-errors)
+               :nb-items 8
+               :errors? true})))
+
 (defn partition-all-2
   [coll]
   (partition-all (quot (count coll) 2) coll))
@@ -294,13 +364,12 @@
                               bulk-res (-> (bulk-fn conn
                                                     prepared-docs
                                                     {:refresh "true"})
-                                           first
                                            :items)
                               expected-result-label (case action
-                                             :create "created"
-                                             :update "updated"
-                                             :index "created"
-                                             :delete "deleted")
+                                                        :create "created"
+                                                        :update "updated"
+                                                        :index "created"
+                                                        :delete "deleted")
                               expected-search-count (cond->> (count action-docs)
                                                       (= action :delete) (- (count sample-docs)))]
                           (is (= (count bulk-res) (count action-docs)))
@@ -331,21 +400,6 @@
                  :delete
                  to-delete-docs
                  {})
-       (testing "delete docs without partitioning"
-         (is (->> (sut/bulk-delete-docs conn
-                                        to-delete-docs
-                                        {:refresh "true"})
-                  :items
-                  (every? #(= "deleted" (:result %)))))
-         (is (= (set (map :id to-update-docs))
-                (->> (sut/search-docs conn
-                                      indexname
-                                      {:query_string {:query "*"}}
-                                      {:bar "foo"}
-                                      {})
-                     :data
-                     (map :id)
-                     set))))
        (testing "bulk-post shall properly submit different action types in a single post"
          ;; delete/update remaining docs, recreate deleted ones
          (let [[remaining-to-update remaining-to-delete] (partition-all-2 to-update-docs)
@@ -356,20 +410,20 @@
                              :index to-reindex-docs
                              :update prepared-update-docs
                              :delete remaining-to-delete}
-               grouped-res (->> (sut/bulk conn bulk-actions {:refresh "true"})
+               bulk-res (sut/bulk conn bulk-actions {:refresh "true"})
+               grouped-res (->> bulk-res
                                 :items
-                                (group-by key))
+                                (group-by ffirst))
                check-fn (fn [action filter-map]
                           (testing (format "bulk shall properly handle %s actions" action)
-                            (let [expected-docs (get grouped-res action)]
-                              (is (= (count expected-docs)
-                                     (get-in
-                                      (sut/search-docs conn
-                                                       indexname
-                                                       {:ids {:values (map :_id expected-docs)}}
-                                                       filter-map
-                                                       {})
-                                      [:paging :total-hits]))))))]
+                            (let [expected-ids (->> (mapcat vals
+                                                            (get grouped-res action))
+                                                    (map :_id))
+                                  ids-query (query/ids expected-ids)
+                                  q (query/filter-map->terms-query filter-map ids-query)]
+                              (assert (seq expected-ids))
+                              (is (= (if (= action :delete) 0 (count expected-ids))
+                                     (sut/count-docs conn indexname q))))))]
            (check-fn :create {})
            (check-fn :index {})
            (check-fn :update {:title "reupdated"})
