@@ -345,7 +345,7 @@
      "all ES Document Bulk operations"
      #(es-index/delete! conn indexname)
      (let [doc-type (if (= version 5) "test-type" "_doc")
-           nb-sample-docs 100
+           nb-sample-docs 1000
            sample-docs (->> (repeatedly nb-sample-docs
                                         #(hash-map :id (str (UUID/randomUUID))
                                                    :_index indexname
