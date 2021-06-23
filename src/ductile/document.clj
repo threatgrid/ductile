@@ -8,7 +8,8 @@
             [ductile.query :as q]
             [ductile.schemas :refer [CRUDOptions ESAggs ESConn ESQuery]]
             [schema.core :as s]
-            [schema-tools.core :as st]))
+            [schema-tools.core :as st])
+  (:import java.io.ByteArrayInputStream))
 
 (def default-limit 1000)
 (def default-retry-on-conflict 5)
@@ -128,13 +129,20 @@
                        ops-with-size)]
     (reverse (map second groups))))
 
+(defn string->input-stream
+  [^String s]
+  (-> s
+      (.getBytes)
+      (ByteArrayInputStream.)))
+
 (defn ^:private bulk-post-docs
   [json-ops
    {:keys [uri request-fn] :as conn}
    opts]
   (let [bulk-body (-> json-ops
                       (interleave (repeat "\n"))
-                      string/join)]
+                      string/join
+                      string->input-stream)]
     (-> (conn/make-http-opts conn
                              opts
                              [:refresh]
