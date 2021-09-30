@@ -662,6 +662,61 @@
                                              :refresh "true"})))
            "delete-by-query with wait-for-completion? set to false should directly return an answer before deletion with a task id")))))
 
+(deftest ^:integration update-by-query-test
+  (let [indexname "test_index"]
+    (for-each-es-version
+     "update by query."
+     #(es-index/delete! conn indexname)
+     (let [;; init state
+           doc-type (if (= version 5) "test-type" "_doc")
+           base-mappings (cond->> {:dynamic false ;; do not index fields without mapping
+                                   :properties {:name {:type "text"}
+                                                :age {:type "integer"}}}
+                           (= version 5) (assoc {} doc-type)) ;; ES5/7 mapping compatilbity
+           base-settings {:number_of_shards "1"
+                          :number_of_replicas "1"}
+           index-create-res (es-index/create!
+                             conn
+                             indexname
+                             {:mappings base-mappings
+                              :settings base-settings})
+           _ (assert (true? (boolean index-create-res))
+                     "the test index was not properly initialized")
+
+           ;; insert some documents
+           sample-docs (map #(hash-map :id (str (UUID/randomUUID))
+                                       ;; :_index indexname
+                                       ;; :_type doc-type
+                                       :name (str "name " %)
+                                       :age %
+                                       :sport "boxing")
+                            (range 20))
+           _ (doseq [doc sample-docs]
+               (sut/create-doc
+                conn
+                indexname
+                "doc-type"
+                doc
+                {:refresh "true"}))]
+       (testing "filter on a query and update with a script"
+         (sut/update-by-query
+          conn
+          [indexname]
+          {:script {:source "ctx._source.title='young'"}
+           :query {:range {:age {:lt 10}}}}
+          {:refresh "true"})
+
+         (is (= 10 (->> (sut/search-docs
+                         conn
+                         indexname
+                         {:query_string {:query "*"}}
+                         {}
+                         {})
+                        :data
+                        (filter #(-> % :title (= "young")))
+                        count))
+             "selected records have gotten updated"))))))
+
 (deftest query-params-test
   (let [;; Note: index not created in this test
         indexname (str "test_index" (UUID/randomUUID))

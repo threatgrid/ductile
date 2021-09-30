@@ -6,9 +6,13 @@
             [ductile.conn :as conn]
             [ductile.pagination :as pagination]
             [ductile.query :as q]
-            [ductile.schemas :refer [CRUDOptions ESAggs ESConn ESQuery]]
-            [schema.core :as s]
-            [schema-tools.core :as st])
+            [ductile.schemas :refer [CRUDOptions
+                                     ESAggs
+                                     ESConn
+                                     ESQuery
+                                     UpdateByQueryParams]]
+            [schema-tools.core :as st]
+            [schema.core :as s])
   (:import java.io.ByteArrayInputStream))
 
 (def default-limit 1000)
@@ -396,10 +400,8 @@
 
 (s/defn delete-by-query-uri
   [uri index-names]
-  (let [index (string/join "," index-names)]
-    (str (uri/uri uri
-                  (uri/uri-encode index)
-                  "_delete_by_query"))))
+  (let [index (uri/uri-encode (string/join "," index-names))]
+    (str (uri/uri uri index "_delete_by_query"))))
 
 (s/defn delete-by-query
   "delete all documents that match a query in an index"
@@ -414,6 +416,28 @@
                            nil)
       (assoc :method :post
              :url (delete-by-query-uri uri index-names))
+      request-fn
+      conn/safe-es-read))
+
+(s/defn update-by-query-uri
+  [uri index-names]
+  (let [index (uri/uri-encode (string/join "," index-names))]
+    (str (uri/uri uri index "_update_by_query"))))
+
+(s/defn update-by-query
+  "Performs an update on every document in the data stream or index without modifying
+  the source, which is useful for picking up mapping changes."
+  [{:keys [uri request-fn] :as conn} :- ESConn
+   index-names :- [s/Str]
+   form-params :- UpdateByQueryParams
+   opts :- CRUDOptions]
+  (-> (conn/make-http-opts conn
+                           opts
+                           [:refresh :wait_for_completion :conflicts]
+                           form-params
+                           {})
+      (assoc :method :post
+             :url (update-by-query-uri uri index-names))
       request-fn
       conn/safe-es-read))
 
