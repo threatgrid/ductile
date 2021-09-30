@@ -1,0 +1,3 @@
+{:linters
+ {:unresolved-symbol
+  {:exclude [(ductile.test-helpers/for-each-es-version [version conn])]}}}
