@@ -668,9 +668,9 @@
      "update by query."
      #(es-index/delete! conn indexname)
      (let [;; init state
-           doc-type (if (= version 5) "test-type" "_doc")
+           doc-type (when (= 5 version) :test-type)
            base-mappings (cond->> {:dynamic false ;; do not index fields without mapping
-                                   :properties {:name {:type "text"}
+                                   :properties {:name {:type "keyword"}
                                                 :age {:type "integer"}}}
                            (= version 5) (assoc {} doc-type)) ;; ES5/7 mapping compatilbity
            base-settings {:number_of_shards "1"
@@ -710,12 +710,37 @@
                          conn
                          indexname
                          {:query_string {:query "*"}}
-                         {}
-                         {})
+                         {} {})
                         :data
                         (filter #(-> % :title (= "young")))
                         count))
-             "selected records have gotten updated"))))))
+             "selected records have gotten updated"))
+       (testing "pick new properties"
+         (let [query-fn #(sut/query
+                          conn
+                          indexname
+                          {:match {"sport" "boxing"}} {})]
+           ;; for some reason ver 5 still retuns the results for the query above,
+           ;; even though it supposedly shouldn't. The mapping for the field doesn't
+           ;; exist at this point and it's not indexed
+           (when (= 7 version)
+             (is (= 0 (->> (query-fn) :data count))))
+
+           (es-index/update-mappings!
+            conn
+            indexname
+            (some-> doc-type name)
+            (assoc-in
+             base-mappings
+             (remove nil? [doc-type :properties :sport])
+             {:type "text"}))
+
+           (sut/update-by-query
+            conn
+            [indexname] {}
+            {:refresh "true"})
+
+           (is (= 20 (->> (query-fn) :data count)))))))))
 
 (deftest query-params-test
   (let [;; Note: index not created in this test

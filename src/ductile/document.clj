@@ -429,12 +429,12 @@
   the source, which is useful for picking up mapping changes."
   [{:keys [uri request-fn] :as conn} :- ESConn
    index-names :- [s/Str]
-   form-params :- UpdateByQueryParams
+   form-params :- (s/maybe UpdateByQueryParams)
    opts :- CRUDOptions]
   (-> (conn/make-http-opts conn
                            opts
                            [:refresh :wait_for_completion :conflicts]
-                           form-params
+                           (or form-params {})
                            {})
       (assoc :method :post
              :url (update-by-query-uri uri index-names))
