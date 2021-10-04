@@ -684,19 +684,18 @@
                      "the test index was not properly initialized")
 
            ;; insert some documents
-           sample-docs (map #(-> (hash-map :id (str (UUID/randomUUID))
+           sample-docs (map #(-> (hash-map :_index indexname
+                                           :_id (str (UUID/randomUUID))
+                                           :_type doc-type
                                            :name (str "name " %)
                                            :age %
                                            ;; one more field that's not indexed yet
                                            :sport "boxing"))
                             (range 20))
-           _ (doseq [doc sample-docs]
-               (sut/create-doc
-                conn
-                indexname
-                doc-type
-                doc
-                {:refresh "true"}))]
+           _ (sut/bulk-create-docs
+              conn
+              sample-docs
+              {:refresh "true"})]
        (testing "filter on a query and update with a script"
          (sut/update-by-query
           conn
