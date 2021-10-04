@@ -668,7 +668,7 @@
      "update by query."
      #(es-index/delete! conn indexname)
      (let [;; init state
-           doc-type (when (= 5 version) :test-type)
+           doc-type (when (= 5 version) "sighting")
            base-mappings (cond->> {:dynamic false ;; do not index fields without mapping
                                    :properties {:name {:type "keyword"}
                                                 :age {:type "integer"}}}
@@ -684,18 +684,17 @@
                      "the test index was not properly initialized")
 
            ;; insert some documents
-           sample-docs (map #(hash-map :id (str (UUID/randomUUID))
-                                       ;; :_index indexname
-                                       ;; :_type doc-type
-                                       :name (str "name " %)
-                                       :age %
-                                       :sport "boxing")
+           sample-docs (map #(-> (hash-map :id (str (UUID/randomUUID))
+                                           :name (str "name " %)
+                                           :age %
+                                           ;; one more field that's not indexed yet
+                                           :sport "boxing"))
                             (range 20))
            _ (doseq [doc sample-docs]
                (sut/create-doc
                 conn
                 indexname
-                "doc-type"
+                doc-type
                 doc
                 {:refresh "true"}))]
        (testing "filter on a query and update with a script"
@@ -720,26 +719,31 @@
                           conn
                           indexname
                           {:match {"sport" "boxing"}} {})]
-           ;; for some reason ver 5 still retuns the results for the query above,
-           ;; even though it supposedly shouldn't. The mapping for the field doesn't
-           ;; exist at this point and it's not indexed
-           (when (= 7 version)
-             (is (= 0 (->> (query-fn) :data count))))
+           ;; since :sport field mapping doesn't exist yet, there should be no data
+           (is (= 0 (->> (query-fn) :data count)))
 
+           ;; update the mappings, to include :sport field
            (es-index/update-mappings!
             conn
             indexname
-            (some-> doc-type name)
+            doc-type
             (assoc-in
              base-mappings
-             (remove nil? [doc-type :properties :sport])
-             {:type "text"}))
+             (remove nil? [doc-type :properties :sport :type])
+             "text"))
 
+           ;; since mapping was updated _after_ we inserted data, :sport field still
+           ;; not indexed, and searching on that field still shouldn't get anything
+           (is (= 0 (->> (query-fn) :data count)))
+
+           ;; now we force ES to pick up properties that were added _after_ the data
+           ;; was initially inserted
            (sut/update-by-query
             conn
             [indexname] {}
             {:refresh "true"})
 
+           ;; and finally, :sport field is properly indexed and appears when searched
            (is (= 20 (->> (query-fn) :data count)))))))))
 
 (deftest query-params-test
