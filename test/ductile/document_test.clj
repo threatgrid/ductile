@@ -671,7 +671,8 @@
            doc-type (when (= 5 version) "sighting")
            base-mappings (cond->> {:dynamic false ;; do not index fields without mapping
                                    :properties {:name {:type "keyword"}
-                                                :age {:type "integer"}}}
+                                                :age {:type "integer"}
+                                                :title {:type "text"}}}
                            (= version 5) (assoc {} doc-type)) ;; ES5/7 mapping compatilbity
            base-settings {:number_of_shards "1"
                           :number_of_replicas "1"}
@@ -697,22 +698,25 @@
               sample-docs
               {:refresh "true"})]
        (testing "filter on a query and update with a script"
-         (sut/update-by-query
-          conn
-          [indexname]
-          {:script {:source "ctx._source.title='young'"}
-           :query {:range {:age {:lt 10}}}}
-          {:refresh "true"})
-
-         (is (= 10 (->> (sut/search-docs
-                         conn
-                         indexname
-                         {:query_string {:query "*"}}
-                         {} {})
-                        :data
-                        (filter #(-> % :title (= "young")))
-                        count))
-             "selected records have gotten updated"))
+         (let [query-fn #(sut/search-docs
+                          conn
+                          indexname
+                          {:query_string {:query "title:young"}}
+                          {} {})]
+           (is (= 0 (->> (query-fn) :data count))
+               "no records with title:young at this point")
+           (is (= 10 (-> (sut/update-by-query
+                          conn
+                          [indexname]
+                          {:script {:source "ctx._source.title=\"young\""}
+                           :query {:range {:age {:lt 10}}}}
+                          {:refresh "true"})
+                         :updated))
+               "expected to update exact number of records")
+           (is (= 10 (->> (query-fn)
+                          :data
+                          count))
+               "selected records have gotten updated")))
        (testing "pick new properties"
          (let [query-fn #(sut/query
                           conn
