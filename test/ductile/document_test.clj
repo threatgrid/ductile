@@ -730,10 +730,8 @@
             conn
             indexname
             doc-type
-            (assoc-in
-             base-mappings
-             (remove nil? [doc-type :properties :sport :type])
-             "text"))
+            (cond->> {:properties {:sport {:type "text"}}}
+              (= version 5) (assoc {} doc-type)))
 
            ;; since mapping was updated _after_ we inserted data, :sport field still
            ;; not indexed, and searching on that field still shouldn't get anything
