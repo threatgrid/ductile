@@ -23,14 +23,17 @@
            (sut/search-uri "http://localhost:9200"
                            nil)))))
 
-(deftest delete-by-query-uri-test
+(deftest x-by-query-uri-test
   (testing "should generate a valid delete_by_query uri"
     (is (= "http://localhost:9200/ctim/_delete_by_query"
-           (sut/delete-by-query-uri "http://localhost:9200"
-                                    ["ctim"])))
+           (sut/delete-by-query-uri "http://localhost:9200" ["ctim"])))
     (is (= "http://localhost:9200/ctim%2Cctia/_delete_by_query"
-           (sut/delete-by-query-uri "http://localhost:9200"
-                                    ["ctim", "ctia"])))))
+           (sut/delete-by-query-uri "http://localhost:9200" ["ctim", "ctia"]))))
+  (testing "should generate a valid update_by_query uri"
+    (is (= "http://localhost:9200/ctim/_update_by_query"
+           (sut/update-by-query-uri "http://localhost:9200" ["ctim"])))
+    (is (= "http://localhost:9200/ctim%2Cctia/_update_by_query"
+           (sut/update-by-query-uri "http://localhost:9200" ["ctim", "ctia"])))))
 
 (deftest index-doc-uri-test
   (testing "should generate a valid doc URI"
