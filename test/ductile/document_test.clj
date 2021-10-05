@@ -23,14 +23,17 @@
            (sut/search-uri "http://localhost:9200"
                            nil)))))
 
-(deftest delete-by-query-uri-test
+(deftest x-by-query-uri-test
   (testing "should generate a valid delete_by_query uri"
     (is (= "http://localhost:9200/ctim/_delete_by_query"
-           (sut/delete-by-query-uri "http://localhost:9200"
-                                    ["ctim"])))
+           (sut/delete-by-query-uri "http://localhost:9200" ["ctim"])))
     (is (= "http://localhost:9200/ctim%2Cctia/_delete_by_query"
-           (sut/delete-by-query-uri "http://localhost:9200"
-                                    ["ctim", "ctia"])))))
+           (sut/delete-by-query-uri "http://localhost:9200" ["ctim", "ctia"]))))
+  (testing "should generate a valid update_by_query uri"
+    (is (= "http://localhost:9200/ctim/_update_by_query"
+           (sut/update-by-query-uri "http://localhost:9200" ["ctim"])))
+    (is (= "http://localhost:9200/ctim%2Cctia/_update_by_query"
+           (sut/update-by-query-uri "http://localhost:9200" ["ctim", "ctia"])))))
 
 (deftest index-doc-uri-test
   (testing "should generate a valid doc URI"
@@ -661,6 +664,91 @@
                                             {:wait_for_completion false
                                              :refresh "true"})))
            "delete-by-query with wait-for-completion? set to false should directly return an answer before deletion with a task id")))))
+
+(deftest ^:integration update-by-query-test
+  (let [indexname "test_index"]
+    (for-each-es-version
+     "update by query."
+     #(es-index/delete! conn indexname)
+     (let [;; init state
+           doc-type (when (= 5 version) "sighting")
+           base-mappings (cond->> {:dynamic false ;; do not index fields without mapping
+                                   :properties {:name {:type "keyword"}
+                                                :age {:type "integer"}
+                                                :title {:type "text"}}}
+                           (= version 5) (assoc {} doc-type)) ;; ES5/7 mapping compatilbity
+           base-settings {:number_of_shards "1"
+                          :number_of_replicas "1"}
+           index-create-res (es-index/create!
+                             conn
+                             indexname
+                             {:mappings base-mappings
+                              :settings base-settings})
+           _ (assert (true? (boolean index-create-res))
+                     "the test index was not properly initialized")
+
+           ;; insert some documents
+           sample-docs (map #(-> (hash-map :_index indexname
+                                           :_id (str (UUID/randomUUID))
+                                           :_type doc-type
+                                           :name (str "name " %)
+                                           :age %
+                                           ;; one more field that's not indexed yet
+                                           :sport "boxing"))
+                            (range 20))
+           _ (sut/bulk-create-docs
+              conn
+              sample-docs
+              {:refresh "true"})]
+       (testing "filter on a query and update with a script"
+         (let [query-fn #(sut/search-docs
+                          conn
+                          indexname
+                          {:query_string {:query "title:young"}}
+                          {} {})]
+           (is (= 0 (->> (query-fn) :data count))
+               "no records with title:young at this point")
+           (is (= 10 (-> (sut/update-by-query
+                          conn
+                          [indexname]
+                          {:script {:source "ctx._source.title=\"young\""}
+                           :query {:range {:age {:lt 10}}}}
+                          {:refresh "true"})
+                         :updated))
+               "expected to update exact number of records")
+           (is (= 10 (->> (query-fn)
+                          :data
+                          count))
+               "selected records have gotten updated")))
+       (testing "pick new properties"
+         (let [query-fn #(sut/query
+                          conn
+                          indexname
+                          {:match {"sport" "boxing"}} {})]
+           ;; since :sport field mapping doesn't exist yet, there should be no data
+           (is (= 0 (->> (query-fn) :data count)))
+
+           ;; update the mappings, to include :sport field
+           (es-index/update-mappings!
+            conn
+            indexname
+            doc-type
+            (cond->> {:properties {:sport {:type "text"}}}
+              (= version 5) (assoc {} doc-type)))
+
+           ;; since mapping was updated _after_ we inserted data, :sport field still
+           ;; not indexed, and searching on that field still shouldn't get anything
+           (is (= 0 (->> (query-fn) :data count)))
+
+           ;; now we force ES to pick up properties that were added _after_ the data
+           ;; was initially inserted
+           (sut/update-by-query
+            conn
+            [indexname] {}
+            {:refresh "true"})
+
+           ;; and finally, :sport field is properly indexed and appears when searched
+           (is (= 20 (->> (query-fn) :data count)))))))))
 
 (deftest query-params-test
   (let [;; Note: index not created in this test

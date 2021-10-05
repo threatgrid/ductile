@@ -107,3 +107,13 @@
      :rep s/Int
      :docs.count s/Int
      :docs.deleted s/Int})])
+
+(s/defschema ESScript
+  (st/optional-keys
+   {:source s/Str
+    :params {s/Str s/Any}}))
+
+(s/defschema UpdateByQueryParams
+  (st/optional-keys
+   {:script ESScript
+    :query  ESQuery}))
