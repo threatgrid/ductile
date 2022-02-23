@@ -44,15 +44,15 @@
 
 we force all values to lowercase, since our indexing does the same for all terms."
   [filters]
-  (vec (map (fn [[k v]]
-              (terms (->> k
-                          (map name)
-                          (str/join "."))
-                     (map #(if (string? %)
-                             (str/lower-case %)
-                             %)
-                          (if (coll? v) v [v]))))
-            filters)))
+  (mapv (fn [[k v]]
+          (terms (->> k
+                      (map name)
+                      (str/join "."))
+                 (map #(if (string? %)
+                         (str/lower-case %)
+                         %)
+                      (if (coll? v) v [v]))))
+        filters))
 
 (defn prepare-terms [filter-map]
   (let [terms (map (fn [[k v]]
