@@ -484,7 +484,8 @@
                              {:type (name remap-type)
                               :script {:lang "painless"
                                        ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
-                                       :inline (format "params.remappings[doc['%s']] ?: params.default" field-name)
+                                       :inline (format "params.remappings[doc['%s']] ?: params.default"
+                                                       field-name)
                                        :params {:remappings remappings
                                                 :default remap-default}}
                               :order order}})))
