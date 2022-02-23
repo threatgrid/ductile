@@ -453,17 +453,17 @@
 
 (defn sort-params-ext
   [sort_by_ext default-sort_order]
-  {:sort (mapv (fn [{:keys [op] :as params}]
+  {:sort (mapv (fn [{:keys [op field-name sort_order] :as params}
+                    order (or default-sort_order sort_order)]
+                 (assert (keyword? order) (pr-str order))
+                 (assert (string? field-name) (pr-str field-name))
+                 (assert (not (some #{"'"} field-name)) (pr-str field-name))
                  (case op
                    ;; eg
                    #_{:op :field
                       :field-name "Severity"
                       :sort_order :asc}
-                   :field (let [{:keys [field-name sort_order]} params
-                                order (or default-sort_order sort_order)]
-                            (assert (keyword? order) (pr-str order))
-                            (assert (string? field-name) (pr-str field-name))
-                            {field-name {:order order}})
+                   :field {field-name {:order order}}
                    ;; eg
                    #_{:op :remap
                       :remap-type :number
@@ -472,12 +472,8 @@
                                    "High" 1}
                       :sort_order :asc
                       :remap-default 0}
-                   :remap (let [{:keys [remap-type remap-default field-name remappings sort_order]} params
-                                order (or default-sort_order sort_order)]
+                   :remap (let [{:keys [remap-type remap-default remappings]} params]
                             (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
-                            (assert (string? field-name) (pr-str field-name))
-                            (assert (not (some #{"'"} field-name)) (pr-str field-name))
-                            (assert (keyword? order) (pr-str order))
                             (assert (seq remappings) (pr-str remappings))
                             ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
                             {:_script
