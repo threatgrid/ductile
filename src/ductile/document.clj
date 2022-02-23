@@ -458,7 +458,7 @@
                    ;; eg
                    #_{:op :field
                       :field-name "Severity"
-                      :sort_order :ASC}
+                      :sort_order :asc}
                    :field (let [{:keys [field-name sort_order]} params
                                 order (or default-sort_order sort_order)]
                             (assert (keyword? order) (pr-str order))
@@ -470,7 +470,7 @@
                       :field-name "Severity"
                       :remappings {"Critical" 0
                                    "High" 1}
-                      :sort_order :ASC
+                      :sort_order :asc
                       :remap-default 0}
                    :remap (let [{:keys [remap-type remap-default field-name remappings sort_order]} params
                                 order (or default-sort_order sort_order)]
