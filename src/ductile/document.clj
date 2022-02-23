@@ -443,43 +443,54 @@
       conn/safe-es-read))
 
 (defn sort-params
-  ([{:keys [sort_by sort_order sorting-scripts]}]
-   (let [sort-fields
-         (into {}
-               (map (fn [field]
-                      (let [[field-name field-order & exploded-opts] (string/split field #":")
-                            field-order (keyword (or field-order sort_order))]
-                        (cond
-                          ;; `:field_order?:opts-not-containing-comma`
-                          ;; if field name is empty,
-                          (empty? field-name)
-                          (let [[op & opts] (edn/read-string (string/join ":" exploded-opts))]
-                            (case op
-                              :sorting_script (let [[sorting-script-name] opts
-                                                    script (get sorting-scripts sorting-script-name)]
-                                                (if-some [script (get sorting-scripts sorting-script-name)]
-                                                  ))
-                              (throw (ex-info (str "Unknown sort-params option: " (pr-str ))))))
-                          ;; `field-name:field_order`
-                          ;; sorting via field
-                          :else
-                          {field-name
-                           {:order field-order}}))))
-               (string/split (name sort_by) #","))]
-     {:sort sort-fields}))
-  ([sort_by sort_order]
-   (sort-params {:sort_by sort_by
-                 :sort_order sort_order})))
+  [sort_by sort_order]
+  (let [sort-fields
+        (map (fn [field]
+               (let [[field-name field-order] (string/split field #":")]
+                 {field-name
+                  {:order (keyword (or field-order sort_order))}}))
+             (string/split (name sort_by) #","))]
+
+    ;; FIXME hash map loses ordering, "sort" accepts a list
+    {:sort (into {} sort-fields)}))
+
+(defn sort-params-ext
+  [sort_by_ext default-sort_order]
+  {:sort (mapv (fn [{:keys [op] :as params}]
+                 (case op
+                   :field (let [{:keys [field-name sort_order]} params
+                                order (or default-sort_order sort_order)]
+                            (assert (keyword? order) (pr-str order))
+                            (assert (string? field-name) (pr-str field-name))
+                            {field-name {:order order}})
+                   :remap-strings-to-numbers (let [{:keys [field-name mapping sort_order]} params
+                                                   order (or default-sort_order sort_order)]
+                                               (assert (string? field-name) (pr-str field-name))
+                                               (assert (not (some #{"'"} field-name)) (pr-str field-name))
+                                               (assert (keyword? order) (pr-str order))
+                                               (assert (seq mapping) (pr-str mapping))
+                                               ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
+                                               {:_script
+                                                {:type "number"
+                                                 :script {:lang "painless"
+                                                          ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
+                                                          :inline (format "params[doc['%s']] ?: 0" field-name)
+                                                          :params mapping}
+                                                 :order }})))
+               sort_by_ext)})
 
 (defn params->pagination
-  [{:keys [sort_by sort_order offset limit search_after]
+  [{:keys [sort_by sort_by_ext sort_order offset limit search_after]
     :or {sort_order :asc
          limit pagination/default-limit} :as opt}]
+  (assert (not (and sort_by sort_by_ext))
+          "Cannot provide both :sort_by and :sort_by_ext")
   (merge
    {}
    (when sort_by
-     (sort-params (into {:sort_by sort_by :sort_order sort_order}
-                        (select-keys [:sorting-scripts]))))
+     (sort-params sort_by sort_order))
+   (when sort_by_ext
+     (sort-params-ext sort_by_ext sort_order))
    (when limit
      {:size limit})
    (when (and offset
