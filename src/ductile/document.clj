@@ -475,6 +475,7 @@
                     :remap (let [{:keys [remap-type remap-default remappings]} params]
                              (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
                              (assert (seq remappings) (pr-str remappings))
+                             (assert (some? remap-default) (pr-str remap-default))
                              ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
                              {:_script
                               {:type (name remap-type)
@@ -486,6 +487,21 @@
                                                  :default remap-default}}
                                :order order}}))))
                sort_by_ext)})
+
+(comment
+  (sort-params-ext
+    [{:op :field
+      :field-name "Severity"
+      :sort_order :asc}
+     {:op :remap
+      :remap-type :number
+      :field-name "Severity"
+      :remappings {"Critical" 0
+                   "High" 1}
+      :sort_order :asc
+      :remap-default 0}]
+    :asc)
+  )
 
 (defn params->pagination
   [{:keys [sort_by sort_by_ext sort_order offset limit search_after]
