@@ -453,38 +453,38 @@
 
 (defn sort-params-ext
   [sort_by_ext default-sort_order]
-  {:sort (mapv (fn [{:keys [op field-name sort_order] :as params}
-                    order (or default-sort_order sort_order)]
-                 (assert (keyword? order) (pr-str order))
-                 (assert (string? field-name) (pr-str field-name))
-                 (assert (not (some #{"'"} field-name)) (pr-str field-name))
-                 (case op
-                   ;; eg
-                   #_{:op :field
-                      :field-name "Severity"
-                      :sort_order :asc}
-                   :field {field-name {:order order}}
-                   ;; eg
-                   #_{:op :remap
-                      :remap-type :number
-                      :field-name "Severity"
-                      :remappings {"Critical" 0
-                                   "High" 1}
-                      :sort_order :asc
-                      :remap-default 0}
-                   :remap (let [{:keys [remap-type remap-default remappings]} params]
-                            (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
-                            (assert (seq remappings) (pr-str remappings))
-                            ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
-                            {:_script
-                             {:type (name remap-type)
-                              :script {:lang "painless"
-                                       ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
-                                       :inline (format "params.remappings[doc['%s']] ?: params.default"
-                                                       field-name)
-                                       :params {:remappings remappings
-                                                :default remap-default}}
-                              :order order}})))
+  {:sort (mapv (fn [{:keys [op field-name sort_order] :as params}]
+                 (let [order (or default-sort_order sort_order)]
+                  (assert (keyword? order) (pr-str order))
+                  (assert (string? field-name) (pr-str field-name))
+                  (assert (not (some #{"'"} field-name)) (pr-str field-name))
+                  (case op
+                    ;; eg
+                    #_{:op :field
+                       :field-name "Severity"
+                       :sort_order :asc}
+                    :field {field-name {:order order}}
+                    ;; eg
+                    #_{:op :remap
+                       :remap-type :number
+                       :field-name "Severity"
+                       :remappings {"Critical" 0
+                                    "High" 1}
+                       :sort_order :asc
+                       :remap-default 0}
+                    :remap (let [{:keys [remap-type remap-default remappings]} params]
+                             (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
+                             (assert (seq remappings) (pr-str remappings))
+                             ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
+                             {:_script
+                              {:type (name remap-type)
+                               :script {:lang "painless"
+                                        ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
+                                        :inline (format "params.remappings[doc['%s']] ?: params.default"
+                                                        field-name)
+                                        :params {:remappings remappings
+                                                 :default remap-default}}
+                               :order order}}))))
                sort_by_ext)})
 
 (defn params->pagination
