@@ -73,7 +73,7 @@
             (throw (ex-info "ES query parsing error"
                             {:type ::invalid-request
                              :es-http-res res})))
-    (do (log/warn "ES Unknow Error:" res)
+    (do (log/warn "ES Unknown Error:" res)
         (throw (ex-info "ES Unknown Error"
                         {:type ::es-unknown-error
                          :es-http-res res})))))
