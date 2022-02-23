@@ -455,25 +455,39 @@
   [sort_by_ext default-sort_order]
   {:sort (mapv (fn [{:keys [op] :as params}]
                  (case op
+                   ;; eg
+                   #_{:op :field
+                      :field-name "Severity"
+                      :sort_order :ASC}
                    :field (let [{:keys [field-name sort_order]} params
                                 order (or default-sort_order sort_order)]
                             (assert (keyword? order) (pr-str order))
                             (assert (string? field-name) (pr-str field-name))
                             {field-name {:order order}})
-                   :remap-strings-to-numbers (let [{:keys [field-name mapping sort_order]} params
-                                                   order (or default-sort_order sort_order)]
-                                               (assert (string? field-name) (pr-str field-name))
-                                               (assert (not (some #{"'"} field-name)) (pr-str field-name))
-                                               (assert (keyword? order) (pr-str order))
-                                               (assert (seq mapping) (pr-str mapping))
-                                               ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
-                                               {:_script
-                                                {:type "number"
-                                                 :script {:lang "painless"
-                                                          ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
-                                                          :inline (format "params[doc['%s']] ?: 0" field-name)
-                                                          :params mapping}
-                                                 :order order}})))
+                   ;; eg
+                   #_{:op :remap
+                      :remap-type :number
+                      :field-name "Severity"
+                      :remappings {"Critical" 0
+                                   "High" 1}
+                      :sort_order :ASC
+                      :remap-default 0}
+                   :remap (let [{:keys [remap-type remap-default field-name remappings sort_order]} params
+                                order (or default-sort_order sort_order)]
+                            (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
+                            (assert (string? field-name) (pr-str field-name))
+                            (assert (not (some #{"'"} field-name)) (pr-str field-name))
+                            (assert (keyword? order) (pr-str order))
+                            (assert (seq remappings) (pr-str remappings))
+                            ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
+                            {:_script
+                             {:type (name remap-type)
+                              :script {:lang "painless"
+                                       ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
+                                       :inline (format "params.remappings[doc['%s']] ?: params.default" field-name)
+                                       :params {:remappings remappings
+                                                :default remap-default}}
+                              :order order}})))
                sort_by_ext)})
 
 (defn params->pagination
