@@ -1,6 +1,7 @@
 (ns ductile.document
   (:require [cemerick.uri :as uri]
             [cheshire.core :as json]
+            [clojure.edn :as edn]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
             [ductile.conn :as conn]
@@ -442,24 +443,43 @@
       conn/safe-es-read))
 
 (defn sort-params
-  [sort_by sort_order]
-  (let [sort-fields
-        (map (fn [field]
-               (let [[field-name field-order] (string/split field #":")]
-                 {field-name
-                  {:order (keyword (or field-order sort_order))}}))
-             (string/split (name sort_by) #","))]
-
-    {:sort (into {} sort-fields)}))
+  ([{:keys [sort_by sort_order sorting-scripts]}]
+   (let [sort-fields
+         (into {}
+               (map (fn [field]
+                      (let [[field-name field-order & exploded-opts] (string/split field #":")
+                            field-order (keyword (or field-order sort_order))]
+                        (cond
+                          ;; `:field_order?:opts-not-containing-comma`
+                          ;; if field name is empty,
+                          (empty? field-name)
+                          (let [[op & opts] (edn/read-string (string/join ":" exploded-opts))]
+                            (case op
+                              :sorting_script (let [[sorting-script-name] opts
+                                                    script (get sorting-scripts sorting-script-name)]
+                                                (if-some [script (get sorting-scripts sorting-script-name)]
+                                                  ))
+                              (throw (ex-info (str "Unknown sort-params option: " (pr-str ))))))
+                          ;; `field-name:field_order`
+                          ;; sorting via field
+                          :else
+                          {field-name
+                           {:order field-order}}))))
+               (string/split (name sort_by) #","))]
+     {:sort sort-fields}))
+  ([sort_by sort_order]
+   (sort-params {:sort_by sort_by
+                 :sort_order sort_order})))
 
 (defn params->pagination
   [{:keys [sort_by sort_order offset limit search_after]
     :or {sort_order :asc
-         limit pagination/default-limit}}]
+         limit pagination/default-limit} :as opt}]
   (merge
    {}
    (when sort_by
-     (sort-params sort_by sort_order))
+     (sort-params (into {:sort_by sort_by :sort_order sort_order}
+                        (select-keys [:sorting-scripts]))))
    (when limit
      {:size limit})
    (when (and offset
