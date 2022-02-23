@@ -444,11 +444,11 @@
 (defn sort-params
   [sort_by sort_order]
   (let [sort-fields
-        (map (fn [field]
-               (let [[field-name field-order] (string/split field #":")]
-                 {field-name
-                  {:order (keyword (or field-order sort_order))}}))
-             (string/split (name sort_by) #","))]
+        (mapv (fn [field]
+                (let [[field-name field-order] (string/split field #":")]
+                  {field-name
+                   {:order (keyword (or field-order sort_order))}}))
+              (string/split (name sort_by) #","))]
     {:sort sort-fields}))
 
 (defn sort-params-ext
