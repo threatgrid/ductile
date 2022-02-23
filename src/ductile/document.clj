@@ -1,7 +1,6 @@
 (ns ductile.document
   (:require [cemerick.uri :as uri]
             [cheshire.core :as json]
-            [clojure.edn :as edn]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
             [ductile.conn :as conn]
@@ -450,9 +449,7 @@
                  {field-name
                   {:order (keyword (or field-order sort_order))}}))
              (string/split (name sort_by) #","))]
-
-    ;; FIXME hash map loses ordering, "sort" accepts a list
-    {:sort (into {} sort-fields)}))
+    {:sort sort-fields}))
 
 (defn sort-params-ext
   [sort_by_ext default-sort_order]
