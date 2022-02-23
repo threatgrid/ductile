@@ -476,7 +476,7 @@
                                                           ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
                                                           :inline (format "params[doc['%s']] ?: 0" field-name)
                                                           :params mapping}
-                                                 :order }})))
+                                                 :order order}})))
                sort_by_ext)})
 
 (defn params->pagination
