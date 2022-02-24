@@ -499,12 +499,13 @@
   (if (coll? sort_by)
     (sort-params-ext sort_by sort_order)
     (let [sort-fields
-          (mapv (fn [field]
-                  (let [[field-name field-order] (string/split field #":")]
-                    {field-name
-                     {:order (keyword (or field-order sort_order))}}))
-                (string/split (name sort_by) #","))]
-      {:sort sort-fields})))
+          (map (fn [field]
+                 (let [[field-name field-order] (string/split field #":")]
+                   {field-name
+                    {:order (keyword (or field-order sort_order))}}))
+               (string/split (name sort_by) #","))]
+      ;; FIXME hash map loses ordering, use vector
+      {:sort (into {} sort-fields)})))
 
 (defn params->pagination
   [{:keys [sort_by sort_order offset limit search_after]
