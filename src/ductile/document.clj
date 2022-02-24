@@ -441,16 +441,6 @@
       request-fn
       conn/safe-es-read))
 
-(defn sort-params
-  [sort_by sort_order]
-  (let [sort-fields
-        (mapv (fn [field]
-                (let [[field-name field-order] (string/split field #":")]
-                  {field-name
-                   {:order (keyword (or field-order sort_order))}}))
-              (string/split (name sort_by) #","))]
-    {:sort sort-fields}))
-
 (defn sort-params-ext
   [sort_by_ext default-sort_order]
   (assert (sequential? sort_by_ext))
@@ -504,6 +494,18 @@
     :asc)
   )
 
+(defn sort-params
+  [sort_by sort_order]
+  (if (coll? sort_by)
+    (sort-params-ext sort_by sort_order)
+    (let [sort-fields
+          (mapv (fn [field]
+                  (let [[field-name field-order] (string/split field #":")]
+                    {field-name
+                     {:order (keyword (or field-order sort_order))}}))
+                (string/split (name sort_by) #","))]
+      {:sort sort-fields})))
+
 (defn params->pagination
   [{:keys [sort_by sort_order offset limit search_after]
     :or {sort_order :asc
@@ -511,10 +513,7 @@
   (merge
    {}
    (when sort_by
-     ((if (string? sort_by)
-        sort-params
-        sort-params-ext)
-      sort_by sort_order))
+     (sort-params sort_by sort_order))
    (when limit
      {:size limit})
    (when (and offset

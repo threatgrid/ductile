@@ -10,7 +10,7 @@
   (is (= "https://cisco.com/_security/api_key"
          (sut/api-key-uri "https://cisco.com"))))
 
-(deftest create-api-key!-test
+(deftest ^:integration create-api-key!-test
   (is (set/subset? #{:id :api_key}
                    (-> (connect 7 basic-auth-opts)
                        (sut/create-api-key! {:name "my-api-key"})

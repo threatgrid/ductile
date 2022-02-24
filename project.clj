@@ -24,6 +24,9 @@
   :plugins [[lein-codox "0.10.7"]
             [lein-pprint "1.3.2"]]
   :target-path "target/%s"
+  :test-selectors {:default (complement :integration)
+                   :integration :integration
+                   :all (constantly true)}
   :profiles {:uberjar {:aot :all
                        :pedantic? :abort}
              :dev {:dependencies
