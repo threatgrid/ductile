@@ -511,11 +511,10 @@
   (merge
    {}
    (when sort_by
-     (if (string? sort_by)
-       ((if (string? sort_by)
-          sort-params
-          sort-params-ext)
-        sort_by sort_order)))
+     ((if (string? sort_by)
+        sort-params
+        sort-params-ext)
+      sort_by sort_order))
    (when limit
      {:size limit})
    (when (and offset
