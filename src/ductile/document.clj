@@ -453,6 +453,7 @@
 
 (defn sort-params-ext
   [sort_by_ext default-sort_order]
+  (assert (sequential? sort_by_ext))
   {:sort (mapv (fn [{:keys [op field-name sort_order] :as params}]
                  (let [order (or default-sort_order sort_order)]
                   (assert (keyword? order) (pr-str order))
@@ -504,17 +505,17 @@
   )
 
 (defn params->pagination
-  [{:keys [sort_by sort_by_ext sort_order offset limit search_after]
+  [{:keys [sort_by sort_order offset limit search_after]
     :or {sort_order :asc
          limit pagination/default-limit} :as opt}]
-  (assert (not (and sort_by sort_by_ext))
-          "Cannot provide both :sort_by and :sort_by_ext")
   (merge
    {}
    (when sort_by
-     (sort-params sort_by sort_order))
-   (when sort_by_ext
-     (sort-params-ext sort_by_ext sort_order))
+     (if (string? sort_by)
+       ((if (string? sort_by)
+          sort-params
+          sort-params-ext)
+        sort_by sort_order)))
    (when limit
      {:size limit})
    (when (and offset
