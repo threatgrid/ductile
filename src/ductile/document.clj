@@ -482,7 +482,7 @@
                                             "if(fieldVal == null) {"
                                             "  return params.default"
                                             "} else {"
-                                            "  params.remappings.getOrDefault(fieldVal, params.default)"
+                                            "  return params.remappings.getOrDefault(fieldVal, params.default)"
                                             "}"])
                                  :params {:remappings remappings
                                           :default remap-default}}
