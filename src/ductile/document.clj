@@ -476,8 +476,14 @@
                        {:type (name remap-type)
                         :script {:lang "painless"
                                  ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
-                                 :inline (format "params.remappings[doc['%s']] ?: params.default"
-                                                 field-name)
+                                 :inline (string/join
+                                           "\n"
+                                           [(format "fieldVal = doc['%s'];" field-name)
+                                            "if(fieldVal == null) {"
+                                            "  return params.default"
+                                            "} else {"
+                                            "  params.remappings.getOrDefault(fieldVal, params.default)"
+                                            "}"])
                                  :params {:remappings remappings
                                           :default remap-default}}
                         :order order}}))))
