@@ -445,9 +445,9 @@
   [sort_by_ext default-sort_order]
   (assert (sequential? sort_by_ext))
   {:sort (mapv (fn [{:keys [op field-name sort_order] :as params}]
-                 (let [order (keyword (or sort_order default-sort_order))]
+                 (let [field-name (name field-name)
+                       order (keyword (or sort_order default-sort_order))]
                   (assert (keyword? order) (pr-str order))
-                  (assert (string? field-name) (pr-str field-name))
                   (assert (not (some #{"'"} field-name)) (pr-str field-name))
                   (case op
                     ;; eg
