@@ -477,14 +477,10 @@
                         :script {:lang "painless"
                                  :inline (string/join
                                            "\n"
-                                           [(format "String fieldVal = doc['%s']?.value;" field-name)
-                                            "if(fieldVal == null) {"
-                                            "  Debug.explain('default!!');"
-                                            "  return params.default"
-                                            "} else {"
-                                            "  Debug.explain(params.remappings);"
-                                            "  return params.remappings.getOrDefault(fieldVal, params.default)"
-                                            "}"])
+                                           ;; https://www.elastic.co/guide/en/elasticsearch/painless/8.1/painless-walkthrough.html#_missing_keys
+                                           [(format "if (!doc.containsKey('%s') || doc['%s'].empty) { return params.default }" field-name field-name)
+                                            (format "String fieldVal = doc['%s']?.value;" field-name)
+                                            "return params.remappings.getOrDefault(fieldVal, params.default)"])
                                  :params {:remappings remappings
                                           :default remap-default}}
                         :order order}}))))
