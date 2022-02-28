@@ -482,6 +482,7 @@
                                             "if(fieldVal == null) {"
                                             "  return params.default"
                                             "} else {"
+                                            "  Debug.explain(params.remappings);"
                                             "  return params.remappings.getOrDefault(fieldVal, params.default)"
                                             "}"])
                                  :params {:remappings remappings
