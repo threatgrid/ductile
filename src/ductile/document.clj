@@ -478,11 +478,10 @@
                                  :inline (string/join
                                            "\n"
                                            ;; https://www.elastic.co/guide/en/elasticsearch/painless/8.1/painless-walkthrough.html#_missing_keys
-                                           [(format "if (!doc.containsKey('%s') || doc['%s'].empty) { Debug.explain(doc.containsKey('%s')); return params.default }"
+                                           [(format "if (!doc.containsKey('%s') || doc['%s'].empty) { return params.default }"
                                                     field-name field-name field-name)
-                                            (format "Debug.explain(params.remappings.getOrDefault(doc['%s'].value, params.default));"
-                                                    field-name)
-                                            "return params.remappings.getOrDefault(doc['%s'].value, params.default)"])
+                                            (format "return params.remappings.getOrDefault(doc['%s'].value, params.default)"
+                                                    field-name)])
                                  :params {:remappings remappings
                                           :default remap-default}}
                         :order order}}))))
