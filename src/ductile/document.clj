@@ -471,6 +471,13 @@
                       (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
                       (assert (seq remappings) (pr-str remappings))
                       (assert (some? remap-default) (pr-str remap-default))
+                      (assert (every? string? (keys remappings)) remappings)
+                      (case remap-type
+                        :number (do (assert (number? remap-default) remap-default)
+                                    (assert (every? number? (keys remappings)) remappings)
+                                    )
+                        :string (do (assert (string? remap-default) remap-default)
+                                    (assert (every? string? (keys remappings)) remappings)))
                       ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
                       {:_script
                        {:type (name remap-type)
@@ -478,8 +485,8 @@
                                  :inline (string/join
                                            "\n"
                                            ;; https://www.elastic.co/guide/en/elasticsearch/painless/8.1/painless-walkthrough.html#_missing_keys
-                                           [(format "if (!doc.containsKey('%s') || doc['%s'].empty) { return params.default }"
-                                                    field-name field-name field-name)
+                                           [(format "if (!doc.containsKey('%s') || doc['%s'].size() != 1) { return params.default }"
+                                                    field-name field-name)
                                             (format "return params.remappings.getOrDefault(doc['%s'].value, params.default)"
                                                     field-name)])
                                  :params {:remappings remappings
