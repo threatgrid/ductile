@@ -469,15 +469,14 @@
                     :remap
                     (let [{:keys [remap-type remap-default remappings]} params]
                       (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
-                      (assert (seq remappings) (pr-str remappings))
+                      (assert ((every-pred map? seq) remappings) (pr-str remappings))
                       (assert (some? remap-default) (pr-str remap-default))
                       (assert (every? string? (keys remappings)) remappings)
                       (case remap-type
                         :number (do (assert (number? remap-default) remap-default)
-                                    (assert (every? number? (keys remappings)) remappings)
-                                    )
+                                    (assert (every? number? (vals remappings)) remappings))
                         :string (do (assert (string? remap-default) remap-default)
-                                    (assert (every? string? (keys remappings)) remappings)))
+                                    (assert (every? string? (vals remappings)) remappings)))
                       ;; https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html
                       {:_script
                        {:type (name remap-type)
