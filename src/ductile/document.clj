@@ -475,11 +475,11 @@
                       {:_script
                        {:type (name remap-type)
                         :script {:lang "painless"
-                                 ;; https://www.elastic.co/guide/en/elasticsearch/painless/5.6/_operators.html#_elvis
                                  :inline (string/join
                                            "\n"
                                            [(format "String fieldVal = doc['%s']?.value;" field-name)
                                             "if(fieldVal == null) {"
+                                            "  Debug.explain('default!!');"
                                             "  return params.default"
                                             "} else {"
                                             "  Debug.explain(params.remappings);"
