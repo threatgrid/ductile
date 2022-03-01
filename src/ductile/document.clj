@@ -605,8 +605,6 @@
                                       nil)
                  (assoc :method :post
                         :url (search-uri uri index-name))
-                 (doto
-                   (prn `query))
                  request-fn
                  conn/safe-es-read)]
      (log/debug "search:" search-params)
