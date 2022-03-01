@@ -461,7 +461,7 @@
                     ;; eg
                     ;; {:op :remap
                     ;;  :remap-type :number
-                    ;;  :field-name "Severity"
+                    ;;  :field-name "severity"
                     ;;  :remappings {"Critical" 0
                     ;;               "High" 1}
                     ;;  :sort_order :asc
