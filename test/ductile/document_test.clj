@@ -724,13 +724,13 @@
                      "the test index was not properly initialized")
 
            ;; insert some documents
-           sample-docs (map #(-> (hash-map :_index indexname
-                                           :_id (str (UUID/randomUUID))
-                                           :_type doc-type
-                                           :name (str "name " %)
-                                           :age %
-                                           ;; one more field that's not indexed yet
-                                           :sport "boxing"))
+           sample-docs (map #(hash-map :_index indexname
+                                       :_id (str (UUID/randomUUID))
+                                       :_type doc-type
+                                       :name (str "name " %)
+                                       :age %
+                                       ;; one more field that's not indexed yet
+                                       :sport "boxing")
                             (range 20))
            _ (sut/bulk-create-docs
               conn

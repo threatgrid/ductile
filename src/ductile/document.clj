@@ -467,7 +467,12 @@
                     ;;  :sort_order :asc
                     ;;  :remap-default 0}
                     :remap
-                    (let [{:keys [remap-type remap-default remappings]} params]
+                    (let [{:keys [remap-type remap-default remappings]} params
+                          remappings (into {} (map (fn [e]
+                                                     (mapv #(cond-> %
+                                                              (string? %) string/lower-case)
+                                                           e)))
+                                           remappings)]
                       (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
                       (assert ((every-pred map? seq) remappings) (pr-str remappings))
                       (assert (some? remap-default) (pr-str remap-default))
