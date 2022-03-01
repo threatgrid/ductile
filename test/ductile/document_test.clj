@@ -151,30 +151,54 @@
                                              :field-name "field1"}]
                                   :limit 10000
                                   :search_after ["value1"]})))
-  (is (= {:sort [{:_script
-                  {:type "number"
-                   :script {:lang "painless"
-                            :inline (str "if (!doc.containsKey('severity') || doc['severity'].size() != 1) { return params.default }\n"
-                                         "return params.remappings.getOrDefault(doc['severity'].value, params.default)")
-                            :params {:remappings {"critical" 0, "high" 1}
-                                     :default 0}}
-                   :order :asc}}
-                 {"field1" {:order :desc}}]
-          :size 10000
-          :from 0
-          :search_after ["value1"]}
-         (sut/params->pagination {:sort_by [{:op :remap
-                                             :remap-type :number
-                                             :remappings {"Critical" 0
-                                                          "High" 1}
-                                             :field-name "severity"
-                                             :sort_order :asc
-                                             :remap-default 0}
-                                            {:op :field
-                                             :field-name "field1"
-                                             :sort_order "desc"}]
-                                  :limit 10000
-                                  :search_after ["value1"]}))))
+  (testing ":remap default sort order"
+    (doseq [sort-order [{}
+                        {:sort_order :asc}]]
+      (is (= {:sort [{:_script
+                      {:type "number"
+                       :script {:lang "painless"
+                                :inline (str "if (!doc.containsKey('severity') || doc['severity'].size() != 1) { return params.default }\n"
+                                             "return params.remappings.getOrDefault(doc['severity'].value, params.default)")
+                                :params {:remappings {"critical" 0, "high" 1}
+                                         :default 0}}
+                       :order :asc}}
+                     {"field1" {:order :desc}}]
+              :size 10000
+              :from 0
+              :search_after ["value1"]}
+             (sut/params->pagination {:sort_by [(into {:op :remap
+                                                       :remap-type :number
+                                                       :remappings {"Critical" 0
+                                                                    "High" 1}
+                                                       :field-name "severity"
+                                                       :remap-default 0}
+                                                      sort-order)
+                                                {:op :field
+                                                 :field-name "field1"
+                                                 :sort_order "desc"}]
+                                      :limit 10000
+                                      :search_after ["value1"]}))
+          sort-order)))
+  (testing "remapped string keys are lowercased"
+    (is (= {:sort [{:_script
+                    {:type "string"
+                     :script {:lang "painless"
+                              :inline (str "if (!doc.containsKey('SomeThing') || doc['SomeThing'].size() != 1) { return params.default }\n"
+                                           "return params.remappings.getOrDefault(doc['SomeThing'].value, params.default)")
+                              :params {:remappings {"foo" "BaR"}
+                                       :default "baZ"}}
+                     :order :desc}}]
+            :size 10000
+            :from 0
+            :search_after ["value1"]}
+           (sut/params->pagination {:sort_by [{:op :remap
+                                               :remap-type :string
+                                               :remappings {"FoO" "BaR"}
+                                               :field-name "SomeThing"
+                                               :sort_order :desc
+                                               :remap-default "baZ"}]
+                                    :limit 10000
+                                    :search_after ["value1"]})))))
 
 (deftest generate-search-params-test
   (is (= {:size 10 :from 20}

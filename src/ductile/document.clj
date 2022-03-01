@@ -469,9 +469,8 @@
                     :remap
                     (let [{:keys [remap-type remap-default remappings]} params
                           remappings (into {} (map (fn [e]
-                                                     (mapv #(cond-> %
-                                                              (string? %) string/lower-case)
-                                                           e)))
+                                                     (update e 0 #(cond-> %
+                                                                    (string? %) string/lower-case))))
                                            remappings)]
                       (assert ((some-fn string? simple-keyword?) remap-type) (str "Expected eg., :remap-type :number, actual " (pr-str remap-type)))
                       (assert ((every-pred map? seq) remappings) (pr-str remappings))
