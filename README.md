@@ -371,7 +371,7 @@ Sort by field:
               {:sort [{:op :field
                        ;; sort by the `severity` field
                        :field-name "severity"
-                       ;; sort by :asc[ending] (default) or :desc[ending] order
+                       ;; sort in :asc[ending] (default) or :desc[ending] order
                        :sort_order :asc}]})
 ```
 
