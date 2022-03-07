@@ -497,21 +497,6 @@
                         :order order}}))))
                sort_by_ext)})
 
-(comment
-  (sort-params-ext
-    [{:op :field
-      :field-name "Severity"
-      :sort_order :asc}
-     {:op :remap
-      :remap-type :number
-      :field-name "Severity"
-      :remappings {"Critical" 0
-                   "High" 1}
-      :sort_order :asc
-      :remap-default 0}]
-    :asc)
-  )
-
 (defn sort-params
   [sort_by sort_order]
   (if (coll? sort_by)

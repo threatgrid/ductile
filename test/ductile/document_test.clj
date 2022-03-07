@@ -934,3 +934,30 @@
                                 es-params)
              (pagination-params es7-result
                                 es-params))))))
+
+(deftest sort-params-ext-test
+  ;; example call
+  (is (=
+       {:sort
+        [{"Severity" {:order :asc}}
+         {:_script {:type "number"
+                    :script {:lang "painless"
+                             :inline (str "if (!doc.containsKey('Severity') || doc['Severity'].size() != 1) { return params.default }\n"
+                                          "return params.remappings.getOrDefault(doc['Severity'].value, params.default)")
+                             :params {;; note: lowercased
+                                      :remappings {"critical" 0, "high" 1}
+                                      :default 0}}
+                    :order :asc}}]}
+       (sut/sort-params-ext
+         [{:op :field
+           :field-name "Severity"
+           :sort_order :asc}
+          {:op :remap
+           :remap-type :number
+           :field-name "Severity"
+           ;; note: uppercased keys are lowercased
+           :remappings {"Critical" 0
+                        "High" 1}
+           :sort_order :asc
+           :remap-default 0}]
+         :asc))))
