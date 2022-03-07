@@ -514,7 +514,7 @@
 (defn params->pagination
   [{:keys [sort_by sort_order offset limit search_after]
     :or {sort_order :asc
-         limit pagination/default-limit} :as opt}]
+         limit pagination/default-limit}}]
   (merge
    {}
    (when sort_by
