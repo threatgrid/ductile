@@ -75,38 +75,32 @@
 (deftest params->pagination-test
   (is (= {:size 100
           :sort [{"field1" {:order :asc}}]}
-         (sut/params->pagination {:sort_by :field1})
-         (sut/params->pagination {:sort [{"field1" {:order :asc}}]})))
+         (sut/params->pagination {:sort_by :field1})))
 
   (is (= {:size 100
           :sort [{"field1" {:order :desc}}]}
          (sut/params->pagination {:sort_by "field1:desc"})
-         (sut/params->pagination {:sort [{"field1" {:order :desc}}]})))
+         (sut/params->pagination {:sort_by "field1:desc"
+                                  :sort_order :asc})))
 
   (is (= {:size 100
           :sort [{"field1" {:order :desc}}
                  {"field2" {:order :asc}}
                  {"field3" {:order :desc}}]}
          (sut/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"})
-         (sut/params->pagination {:sort [{"field1" {:order :desc}}
-                                         {"field2" {:order :asc}}
-                                         {"field3" {:order :desc}}]})))
+         (sut/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"
+                                  :sort_order :asc})))
 
   (is (= {:size 100
           :from 1000
           :sort [{"field1" {:order :asc}}]}
          (sut/params->pagination {:sort_by :field1
-                                  :offset 1000})
-         (sut/params->pagination {:sort [{"field1" {:order :asc}}]
                                   :offset 1000})))
 
   (is (= {:size 10000
           :from 1000
           :sort [{"field1" {:order :asc}}]}
          (sut/params->pagination {:sort_by :field1
-                                  :offset 1000
-                                  :limit 10000})
-         (sut/params->pagination {:sort [{"field1" {:order :asc}}]
                                   :offset 1000
                                   :limit 10000})))
 
@@ -118,7 +112,7 @@
                                   :offset 1000
                                   :limit 10000
                                   :search_after ["value1"]})
-         (sut/params->pagination {:sort [{"field1" {:order :asc}}]
+         (sut/params->pagination {:sort_by :field1
                                   :limit 10000
                                   :search_after ["value1"]}))))
 
