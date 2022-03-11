@@ -472,9 +472,6 @@
 
 (defn generate-search-params
   [query aggs params]
-  (assert (not (and (:sort_by params)
-                    (:sort params)))
-          "Don't mix :sort and :sort_by")
   (cond-> (into (params->pagination params)
                 (select-keys params [:sort :_source :track_total_hits]))
     query (assoc :query query)
