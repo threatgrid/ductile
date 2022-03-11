@@ -120,57 +120,7 @@
                                   :search_after ["value1"]})
          (sut/params->pagination {:sort [{"field1" {:order :asc}}]
                                   :limit 10000
-                                  :search_after ["value1"]})))
-  #_ ;; TODO move to CTIA
-  (testing ":remap default sort order"
-    (doseq [sort-order [{}
-                        {:sort_order :asc}]]
-      (is (= {:sort [{:_script
-                      {:type "number"
-                       :script {:lang "painless"
-                                :inline (str "if (!doc.containsKey('severity') || doc['severity'].size() != 1) { return params.default }\n"
-                                             "return params.remappings.getOrDefault(doc['severity'].value, params.default)")
-                                :params {:remappings {"critical" 0, "high" 1}
-                                         :default 0}}
-                       :order :asc}}
-                     {"field1" {:order :desc}}]
-              :size 10000
-              :from 0
-              :search_after ["value1"]}
-             (sut/params->pagination {:sort_by [(into {:op :remap
-                                                       :remap-type :number
-                                                       :remappings {"Critical" 0
-                                                                    "High" 1}
-                                                       :field-name "severity"
-                                                       :remap-default 0}
-                                                      sort-order)
-                                                {:op :field
-                                                 :field-name "field1"
-                                                 :sort_order "desc"}]
-                                      :limit 10000
-                                      :search_after ["value1"]}))
-          sort-order)))
-  #_ ;; TODO move to CTIA
-  (testing "remapped string keys are lowercased"
-    (is (= {:sort [{:_script
-                    {:type "string"
-                     :script {:lang "painless"
-                              :inline (str "if (!doc.containsKey('SomeThing') || doc['SomeThing'].size() != 1) { return params.default }\n"
-                                           "return params.remappings.getOrDefault(doc['SomeThing'].value, params.default)")
-                              :params {:remappings {"foo" "BaR"}
-                                       :default "baZ"}}
-                     :order :desc}}]
-            :size 10000
-            :from 0
-            :search_after ["value1"]}
-           (sut/params->pagination {:sort_by [{:op :remap
-                                               :remap-type :string
-                                               :remappings {"FoO" "BaR"}
-                                               :field-name "SomeThing"
-                                               :sort_order :desc
-                                               :remap-default "baZ"}]
-                                    :limit 10000
-                                    :search_after ["value1"]})))))
+                                  :search_after ["value1"]}))))
 
 (deftest generate-search-params-test
   (is (= {:size 10 :from 20}
@@ -906,31 +856,3 @@
                                 es-params)
              (pagination-params es7-result
                                 es-params))))))
-
-#_
-(deftest sort-params-ext-test
-  ;; example call
-  (is (=
-       {:sort
-        [{"Severity" {:order :asc}}
-         {:_script {:type "number"
-                    :script {:lang "painless"
-                             :inline (str "if (!doc.containsKey('Severity') || doc['Severity'].size() != 1) { return params.default }\n"
-                                          "return params.remappings.getOrDefault(doc['Severity'].value, params.default)")
-                             :params {;; note: lowercased
-                                      :remappings {"critical" 0, "high" 1}
-                                      :default 0}}
-                    :order :asc}}]}
-       (sut/sort-params-ext
-         [{:op :field
-           :field-name "Severity"
-           :sort_order :asc}
-          {:op :remap
-           :remap-type :number
-           :field-name "Severity"
-           ;; note: uppercased keys are lowercased
-           :remappings {"Critical" 0
-                        "High" 1}
-           :sort_order :asc
-           :remap-default 0}]
-         :asc))))
