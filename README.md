@@ -388,7 +388,7 @@ Sort by field:
                {:_script {:type "number",
                           :script {:lang "painless",
                                    :source "doc['theatre'].value.length() * params.factor",
-                                   :params {"factor": 1.1}}
+                                   :params {"factor" 1.1}}
                           :order "asc"}}})
 ```
 
