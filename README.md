@@ -360,7 +360,7 @@ Ductile also provides a search function with a simple interface that offers to u
 
 ### Sorting
 
-Ductile provides sugar for sorting query results.
+Ductile exposes ElasticSearch's [sort parameter](https://www.elastic.co/guide/en/elasticsearch/reference/current/sort-search-results.html) for sorting query results as EDN.
 
 Sort by field:
 
@@ -368,31 +368,28 @@ Sort by field:
 (es-doc/query c
               "test-index"
               (es-query/ids [1 2])
-              {:sort [{:op :field
-                       ;; sort by the `severity` field
-                       :field-name "severity"
-                       ;; sort in :asc[ending] (default) or :desc[ending] order
-                       :sort_order :asc}]})
+              ;; sort by severity field
+              {:sort "severity"})
+
+(es-doc/query c
+              "test-index"
+              (es-query/ids [1 2])
+              ;; sort by the `severity` field in :asc[ending] or :desc[ending] order
+              {:sort {"severity" :asc}})
 ```
 
-Sort by remapping an existing field:
+[Script sort](https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html):
 
 ```clojure
 (es-doc/query c
               "test-index"
               (es-query/ids [1 2])
-              {:sort [{:op :remap
-                       ;; use `severity` field to sort fields
-                       :field-name "severity"
-                       ;; .. by remapping each `severity` to a :number or :string
-                       :remap-type :number
-                       ;; .. where severity=critical maps to 1, severity=high maps to 2
-                       :remappings {"Critical" 1
-                                    "High" 2}
-                       ;; .. and other values map to 0
-                       :remap-default 0
-                       ;; sort remapped values in :asc[ending] (default) or :desc[ending] order
-                       :sort_order :asc}]})
+              {:sort 
+               {:_script {:type "number",
+                          :script {:lang "painless",
+                                   :source "doc['theatre'].value.length() * params.factor",
+                                   :params {"factor": 1.1}}
+                          :order "asc"}}})
 ```
 
 Sort by multiple fields:
@@ -400,10 +397,12 @@ Sort by multiple fields:
 (es-doc/query c
               "test-index"
               (es-query/ids [1 2])
-              {:sort [;; sort first by severity...
-                      {:op :field :field-name "severity"}
-                      ;; then by revision
-                      {:op :field :field-name "revision"}]})
+              {:sort 
+               [{"post_date" {:order "asc" :format "strict_date_optional_time_nanos"}}
+                "user"
+                {"name" "desc"},
+                {"age" "desc"},
+                "_score"]})
 ```
 
 
