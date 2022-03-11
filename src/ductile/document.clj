@@ -454,31 +454,27 @@
     {:sort sort-fields}))
 
 (defn params->pagination
-  [{es-sort :sort :keys [offset limit search_after]
-    :or {limit pagination/default-limit} :as opt}]
-  (cond-> (if-some [sort_by (:sort_by opt)]
-            (let [_ (assert (not es-sort) (str "Cannot provide both :sort_by and :sort"
-                                               (select-keys opt [:sort_by :sort_order :sort])))
-                  res (sort-params sort_by (:sort_order opt :asc))]
-              (binding [*out* *err*]
-                (println (format "DEPRECATED: ductile %s -- use %s"
-                                 (select-keys opt [:sort_by :sort_order])
-                                 res)))
-              res)
-            (do (assert (not (:sort_order opt)) (str "Cannot provide both :sort_order and :sort"
-                                                     (select-keys opt [:sort_order :sort])))
-                (select-keys opt [:sort])))
-    limit (assoc :size limit)
-
-    (and offset (not search_after))
-    (assoc :from offset)
-
-    search_after
-    (assoc :from 0
-           :search_after search_after)))
+  [{:keys [sort_by sort_order offset limit search_after]
+    :or {sort_order :asc
+         limit pagination/default-limit}}]
+  (merge
+   {}
+   (when sort_by
+     (sort-params sort_by sort_order))
+   (when limit
+     {:size limit})
+   (when (and offset
+              (not search_after))
+     {:from offset})
+   (when search_after
+     {:from 0
+      :search_after search_after})))
 
 (defn generate-search-params
   [query aggs params]
+  (assert (not (and (:sort_by params)
+                    (:sort params)))
+          "Don't mix :sort and :sort_by")
   (cond-> (into (params->pagination params)
                 (select-keys params [:sort :_source :track_total_hits]))
     query (assoc :query query)
