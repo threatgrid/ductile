@@ -457,14 +457,16 @@
   [{es-sort :sort :keys [offset limit search_after]
     :or {limit pagination/default-limit} :as opt}]
   (cond-> (if-some [sort_by (:sort_by opt)]
-            (let [_ (assert (not es-sort) "Cannot provide both :sort_by and :sort")
+            (let [_ (assert (not es-sort) (str "Cannot provide both :sort_by and :sort"
+                                               (select-keys opt [:sort_by :sort_order :sort])))
                   res (sort-params sort_by (:sort_order opt :asc))]
               (binding [*out* *err*]
                 (println (format "DEPRECATED: ductile %s -- use %s"
                                  (select-keys opt [:sort_by :sort_order])
                                  res)))
               res)
-            (do (assert (not (:sort_order opt)) "Cannot provide both :sort_order and :sort")
+            (do (assert (not (:sort_order opt)) (str "Cannot provide both :sort_order and :sort"
+                                                     (select-keys opt [:sort_order :sort])))
                 (select-keys opt [:sort])))
     limit (assoc :size limit)
 
