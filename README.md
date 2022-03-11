@@ -348,7 +348,9 @@ it will return not only the matched documents but also meta data like `_index` a
   :next {:limit 2, :offset 2, :search_after [1]},
   :sort [1]}}
 ```
-Ductile also provides a search function with a simple interface that offers to use a Mongo like filters lucene query string to easily match documents
+Ductile also provides a search function with a simple interface that offers to use a Mongo like filters lucene query string to easily match documents.
+`:sort` uses the same format as ElasticSearch's [sort parameter](https://www.elastic.co/guide/en/elasticsearch/reference/current/sort-search-results.html), except via
+EDN.
 
 ```clojure
 (es-doc/search-docs c
@@ -357,54 +359,6 @@ Ductile also provides a search function with a simple interface that offers to u
                     {:age 36}
                     {:sort {:name {:order :desc}}})
 ```
-
-### Sorting
-
-Ductile exposes ElasticSearch's [sort parameter](https://www.elastic.co/guide/en/elasticsearch/reference/current/sort-search-results.html) for sorting query results as EDN.
-
-Sort by field:
-
-```clojure
-(es-doc/query c
-              "test-index"
-              (es-query/ids [1 2])
-              ;; sort by severity field
-              {:sort "severity"})
-
-(es-doc/query c
-              "test-index"
-              (es-query/ids [1 2])
-              ;; sort by the `severity` field in :asc[ending] or :desc[ending] order
-              {:sort {"severity" :asc}})
-```
-
-[Script sort](https://www.elastic.co/guide/en/elasticsearch/painless/current/painless-sort-context.html):
-
-```clojure
-(es-doc/query c
-              "test-index"
-              (es-query/ids [1 2])
-              {:sort 
-               {:_script {:type "number",
-                          :script {:lang "painless",
-                                   :source "doc['theatre'].value.length() * params.factor",
-                                   :params {"factor" 1.1}}
-                          :order "asc"}}})
-```
-
-Sort by multiple fields:
-```clojure
-(es-doc/query c
-              "test-index"
-              (es-query/ids [1 2])
-              {:sort 
-               [{"post_date" {:order "asc" :format "strict_date_optional_time_nanos"}}
-                "user"
-                {"name" "desc"},
-                {"age" "desc"},
-                "_score"]})
-```
-
 
 ### Test stubbing
 
