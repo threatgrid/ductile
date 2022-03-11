@@ -441,6 +441,7 @@
       request-fn
       conn/safe-es-read))
 
+#_
 (defn sort-params-ext
   [sort_by_ext default-sort_order]
   (assert (sequential? sort_by_ext))
@@ -499,34 +500,37 @@
 
 (defn sort-params
   [sort_by sort_order]
-  (if (coll? sort_by)
-    (sort-params-ext sort_by sort_order)
-    (let [sort-fields
-          (mapv (fn [field]
-                  (let [[field-name field-order] (string/split field #":")]
-                    {field-name
-                     {:order (keyword (or field-order sort_order))}}))
-                (string/split (name sort_by) #","))]
-      ;; use vector syntax to preserve ordering
-      ;; https://www.elastic.co/guide/en/elasticsearch/reference/5.5/search-request-sort.html#search-request-sort
-      {:sort sort-fields})))
+  (let [sort-fields
+        (mapv (fn [field]
+                (let [[field-name field-order] (string/split field #":")]
+                  {field-name
+                   {:order (keyword (or field-order sort_order))}}))
+              (string/split (name sort_by) #","))]
+    ;; use vector syntax to preserve ordering
+    ;; https://www.elastic.co/guide/en/elasticsearch/reference/5.5/search-request-sort.html#search-request-sort
+    {:sort sort-fields}))
 
 (defn params->pagination
-  [{:keys [sort_by sort_order offset limit search_after]
-    :or {sort_order :asc
-         limit pagination/default-limit}}]
-  (merge
-   {}
-   (when sort_by
-     (sort-params sort_by sort_order))
-   (when limit
-     {:size limit})
-   (when (and offset
-              (not search_after))
-     {:from offset})
-   (when search_after
-     {:from 0
-      :search_after search_after})))
+  [{es-sort :sort :keys [offset limit search_after]
+    :or {limit pagination/default-limit} :as opt}]
+  (cond-> (if-some [sort_by (:sort_by opt)]
+            (let [_ (assert (not es-sort) "Cannot provide both :sort_by and :sort")
+                  res (sort-params sort_by (:sort_order opt :asc))]
+              (binding [*out* *err*]
+                (println (format "DEPRECATED: ductile %s -- use %s"
+                                 (select-keys opt [:sort_by :sort_order])
+                                 res)))
+              res)
+            (do (assert (not (:sort_order opt)) "Cannot provide both :sort_order and :sort")
+                (select-keys opt [:sort])))
+    limit (assoc :size limit)
+
+    (and offset (not search_after))
+    (assoc :from offset)
+
+    search_after
+    (assoc :from 0
+           :search_after search_after)))
 
 (defn generate-search-params
   [query aggs params]

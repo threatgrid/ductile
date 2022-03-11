@@ -76,56 +76,28 @@
   (is (= {:size 100
           :sort [{"field1" {:order :asc}}]}
          (sut/params->pagination {:sort_by :field1})
-         (sut/params->pagination {:sort_by [{:op :field
-                                             :field-name "field1"}]})))
+         (sut/params->pagination {:sort [{"field1" {:order :asc}}]})))
 
   (is (= {:size 100
           :sort [{"field1" {:order :desc}}]}
          (sut/params->pagination {:sort_by "field1:desc"})
-         (sut/params->pagination {:sort_by [{:op :field
-                                             :field-name "field1"
-                                             :sort_order "desc"}]})
-         (sut/params->pagination {:sort_by "field1:desc"
-                                  :sort_order :asc})
-         (sut/params->pagination {:sort_by [{:op :field
-                                             :field-name "field1"
-                                             :sort_order "desc"}]
-                                  :sort_order :asc})))
+         (sut/params->pagination {:sort [{"field1" {:order :desc}}]})))
 
   (is (= {:size 100
           :sort [{"field1" {:order :desc}}
                  {"field2" {:order :asc}}
                  {"field3" {:order :desc}}]}
          (sut/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"})
-         (sut/params->pagination {:sort_by [{:op :field
-                                             :field-name "field1"
-                                             :sort_order "desc"}
-                                            {:op :field
-                                             :field-name "field2"
-                                             :sort_order "asc"}
-                                            {:op :field
-                                             :field-name "field3"
-                                             :sort_order "desc"}]})
-         (sut/params->pagination {:sort_by "field1:desc,field2:asc,field3:desc"
-                                  :sort_order :asc})
-         (sut/params->pagination {:sort_by [{:op :field
-                                             :field-name "field1"
-                                             :sort_order "desc"}
-                                            {:op :field
-                                             :field-name "field2"
-                                             :sort_order "asc"}
-                                            {:op :field
-                                             :field-name "field3"
-                                             :sort_order "desc"}]
-                                  :sort_order :asc})))
+         (sut/params->pagination {:sort [{"field1" {:order :desc}}
+                                         {"field2" {:order :asc}}
+                                         {"field3" {:order :desc}}]})))
 
   (is (= {:size 100
           :from 1000
           :sort [{"field1" {:order :asc}}]}
          (sut/params->pagination {:sort_by :field1
                                   :offset 1000})
-         (sut/params->pagination {:sort_by [{:op :field
-                                             :field-name "field1"}]
+         (sut/params->pagination {:sort [{"field1" {:order :asc}}]
                                   :offset 1000})))
 
   (is (= {:size 10000
@@ -134,8 +106,7 @@
          (sut/params->pagination {:sort_by :field1
                                   :offset 1000
                                   :limit 10000})
-         (sut/params->pagination {:sort_by [{:op :field
-                                             :field-name "field1"}]
+         (sut/params->pagination {:sort [{"field1" {:order :asc}}]
                                   :offset 1000
                                   :limit 10000})))
 
@@ -147,10 +118,10 @@
                                   :offset 1000
                                   :limit 10000
                                   :search_after ["value1"]})
-         (sut/params->pagination {:sort_by [{:op :field
-                                             :field-name "field1"}]
+         (sut/params->pagination {:sort [{"field1" {:order :asc}}]
                                   :limit 10000
                                   :search_after ["value1"]})))
+  #_ ;; TODO move to CTIA
   (testing ":remap default sort order"
     (doseq [sort-order [{}
                         {:sort_order :asc}]]
@@ -179,6 +150,7 @@
                                       :limit 10000
                                       :search_after ["value1"]}))
           sort-order)))
+  #_ ;; TODO move to CTIA
   (testing "remapped string keys are lowercased"
     (is (= {:sort [{:_script
                     {:type "string"
@@ -935,6 +907,7 @@
              (pagination-params es7-result
                                 es-params))))))
 
+#_
 (deftest sort-params-ext-test
   ;; example call
   (is (=
