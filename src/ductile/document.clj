@@ -444,13 +444,14 @@
 (defn sort-params
   [sort_by sort_order]
   (let [sort-fields
-        (map (fn [field]
-               (let [[field-name field-order] (string/split field #":")]
-                 {field-name
-                  {:order (keyword (or field-order sort_order))}}))
-             (string/split (name sort_by) #","))]
-
-    {:sort (into {} sort-fields)}))
+        (mapv (fn [field]
+                (let [[field-name field-order] (string/split field #":")]
+                  {field-name
+                   {:order (keyword (or field-order sort_order))}}))
+              (string/split (name sort_by) #","))]
+    ;; use vector syntax to preserve ordering
+    ;; https://www.elastic.co/guide/en/elasticsearch/reference/5.5/search-request-sort.html#search-request-sort
+    {:sort sort-fields}))
 
 (defn params->pagination
   [{:keys [sort_by sort_order offset limit search_after]

@@ -172,7 +172,7 @@
          (is (= "2" number_of_shards))
          (is (= "3" number_of_replicas)))))))
 
-(deftest template-test
+(deftest ^:integration template-test
   (for-each-es-version
    "template crud operations should trigger valid _template requests"
    nil
@@ -225,7 +225,7 @@
      (is (nil? (sut/get-template conn template-name-1)))
      (is (nil? (sut/get-template conn template-name-2))))))
 
-(deftest cat-indices-test
+(deftest ^:integration cat-indices-test
   (for-each-es-version
    "cat-indices shall properly return indices data"
    #(sut/delete! conn "*")

@@ -130,7 +130,7 @@ The `version` field accepts an integer value to specify the major Elasticsearch 
                    {:refresh "wait_for"})
 ```
   
-```javascript
+```clojure
 {:id 1, :name "John Doe", :description "an anonymous coward"}
 ```
 
@@ -148,7 +148,7 @@ if you try to create another document with the same id, it will throw an Excepti
 ```
 it will return the document creation result
 
-```javascript
+```clojure
  {:_index "test-index",
   :_type "_doc",
   :_id "1",
@@ -168,7 +168,7 @@ if you do not provide the id field, elasticsearch will insert the document and g
                     :description "yet another anonymous coward"}
                    {:refresh "wait_for"})
 ```
-```javascript
+```clojure
  {:_index "test-index",
   :_type "_doc",
   :_id "EBD9L3ABLWPPOW84CV6I",
@@ -190,7 +190,7 @@ Using the field `id` as document id is the default behavior. However you can pro
                    :mk-id :uri})
 ```
 
-```javascript
+```clojure
  {:_index "test-index",
   :_type "_doc",
   :_id "http://cisco.com/sighting/1",
@@ -210,7 +210,7 @@ another example with a function that return the hash of the created document
                    {:refresh "wait_for"
                    :mk-id hash})
 ```
-```javascript
+```clojure
  {:_index "test-index",
   :_type "_doc",
   :_id "1474268975",
@@ -250,7 +250,7 @@ the 4th parameter offers to set the `refresh` parameter and can take same string
                    {:refresh "wait_for"})
 ```
 it returns the patched document
-```javascript
+```clojure
 {:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}
 ```
  
@@ -262,7 +262,7 @@ it returns the patched document
                 1
                 {})
 ```
-```javascript
+```clojure
 {:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}
 ```
    
@@ -295,7 +295,7 @@ Any of the previous functions can be used on an Elasticsearch 5.x cluster by spe
                 1
                 {})
 ```
-```javascript
+```clojure
 {:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}
 ```
 
@@ -309,7 +309,7 @@ you can either provide classical elasticsearch queries or use some helpers from 
               (es-query/ids [1 2])
               {})
 ```
-```javascript
+```clojure
 {:data
  ({:id 2, :name "Jane Doe", :description "another anonymous coward"}),
  :paging {:total-hits 1}}
@@ -327,7 +327,7 @@ if you need all metadata you can use the full-hits? option
 ```
 it will return not only the matched documents but also meta data like `_index` and `_score`
 
-```javascript
+```clojure
 {:data
  [{:_index "test-index",
    :_type "_doc",
@@ -348,7 +348,9 @@ it will return not only the matched documents but also meta data like `_index` a
   :next {:limit 2, :offset 2, :search_after [1]},
   :sort [1]}}
 ```
-Ductile also provides a search function with a simple interface that offers to use a Mongo like filters lucene query string to easily match documents
+Ductile also provides a search function with a simple interface that offers to use a Mongo like filters lucene query string to easily match documents.
+`:sort` uses the same format as ElasticSearch's [sort parameter](https://www.elastic.co/guide/en/elasticsearch/reference/current/sort-search-results.html), except via
+EDN.
 
 ```clojure
 (es-doc/search-docs c
