@@ -16,7 +16,12 @@
 # See here to set up creds:
 # https://github.com/technomancy/leiningen/blob/stable/doc/DEPLOY.md
 #
-# If you get an error about creds or pushing back to your remote:
+# If you get an error about creds or pushing back to your remote, first
+# figure out if the jar for this version was uploaded to clojars.
+#  https://clojars.org/threatgrid/ductile/versions
+# If yes, you'll need to increment the project.clj version before trying
+# again.
+# If no, you can reset things and set yourself up for success like this:
 # 1. git reset --hard <commit-before-automatic-lein-commit>
 #    - resets any commits lein just created
 # 2. git tag -d <tag-lein-created>
