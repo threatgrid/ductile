@@ -6,8 +6,9 @@ It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited sup
 
 ## Changes
 
-- 0.4.3
+- 0.4.4
   - Fix: preserve field order when sorting by multiple fields
+- 0.4.3: bad version (failed deployment)
 
 ## Usage
 
