@@ -1,0 +1,29 @@
+#!/bin/bash
+# Usage:
+#
+# Before calling, decide which version you want to deploy.
+# Now change the project.clj to that version, but with -SNAPSHOT.
+#
+# Next, decide which version should be the next SNAPSHOT version.
+# This will decide how you call this script:
+#
+# For versions major.minor.patch:
+# ./script/release          # next snapshot bumps patch version
+# ./script/release :patch   # next snapshot bumps patch version
+# ./script/release :minor   # next snapshot bumps minor version
+# ./script/release :major   # next snapshot bumps major version
+#
+# See here to set up creds:
+# https://github.com/technomancy/leiningen/blob/stable/doc/DEPLOY.md
+#
+# If you get an error about creds or pushing back to your remote:
+# 1. git reset --hard <commit-before-automatic-lein-commit>
+#    - resets any commits lein just created
+# 2. git tag -d <tag-lein-created>
+#    - deletes any tags lein just created
+# 3. Do push `git push --set-upstream <your-remote> <your-branch>` so plain `git push` works
+#    - this is the last step of `lein release`.
+
+# TODO: automate deployment using CI
+set -e
+lein release "$@"

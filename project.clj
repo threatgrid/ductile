@@ -17,6 +17,9 @@
                  [com.arohner/uri "0.1.2"]
                  [cheshire "5.9.0"]
                  [base64-clj "0.1.1"]]
+  ;; make `lein deploy` use clojars by default
+  :deploy-repositories [["releases" :clojars]
+                        ["snapshots" :clojars]]
   :repositories [["sonatype-snapshots" {:url "https://oss.sonatype.org/content/repositories/snapshots/"}]]
   :main nil
   :codox {:output-path "doc"

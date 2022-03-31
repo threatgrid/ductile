@@ -4,6 +4,11 @@ A minimalist clojure library for Elasticsearch REST API.
 
 It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited support to prior Elasticsearch version (5 and 6) through a compatibility mode that is more intended to help migrating data.
 
+## Changes
+
+- 0.4.3
+  - Fix: preserve field order when sorting by multiple fields
+
 ## Usage
 
 
