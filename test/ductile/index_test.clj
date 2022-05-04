@@ -34,7 +34,7 @@
            "http://127.0.0.1/test/_rollover/test2"))))
 
 (deftest refresh-uri-test
-  (testing "should generat a proper refresh URI"
+  (testing "should generate a proper refresh URI"
     (is (= (sut/refresh-uri "http://127.0.0.1" "test-index")
            "http://127.0.0.1/test-index/_refresh"))
     (is (= (sut/refresh-uri "http://127.0.0.1" nil)
