@@ -47,12 +47,12 @@
   "check if the supplied ES index exists"
   [{:keys [uri request-fn] :as conn} :- ESConn
    index-name :- s/Str]
-  (not= 404
-        (-> (make-http-opts conn {})
-            (assoc :method :head
-                   :url (index-uri uri index-name))
-            request-fn
-            :status)))
+  (= 200
+     (-> (make-http-opts conn {})
+         (assoc :method :head
+                :url (index-uri uri index-name))
+         request-fn
+         :status)))
 
 (s/defn create!
   "create an index"
