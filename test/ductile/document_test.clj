@@ -161,12 +161,7 @@
                        :foo "bar is a lie"
                        :test_value 42}
            doc-type (if (= version 5) "test-type" "_doc")
-           sample-docs
-           (repeatedly 10
-                       #(hash-map :id (str (UUID/randomUUID))
-                                  :_index indexname
-                                  :bar "foo"
-                                  :_type doc-type))
+
            get-doc (fn [doc-id opts]
                      (sut/get-doc conn indexname doc-type doc-id opts))
            get-sample-doc #(get-doc (:id sample-doc) {})
