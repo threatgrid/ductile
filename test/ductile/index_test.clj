@@ -1,5 +1,6 @@
 (ns ductile.index-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [ductile.conn :as es-conn]
             [ductile.document :as es-doc]
             [ductile.index :as sut]
             [ductile.test-helpers :refer [for-each-es-version]]
@@ -34,11 +35,31 @@
            "http://127.0.0.1/test/_rollover/test2"))))
 
 (deftest refresh-uri-test
-  (testing "should generat a proper refresh URI"
+  (testing "should generate a proper refresh URI"
     (is (= (sut/refresh-uri "http://127.0.0.1" "test-index")
            "http://127.0.0.1/test-index/_refresh"))
     (is (= (sut/refresh-uri "http://127.0.0.1" nil)
            "http://127.0.0.1/_refresh"))))
+
+(deftest index-exists?-test
+  (letfn [(make-conn [status] {:host "localhost"
+                               :port 9200
+                               :request-fn (fn [_req]
+                                             {:status status
+                                              :headers {:content-type "application/clojure"}})})]
+    (testing "should return false unless the status is 200"
+      (is (= false
+             (sut/index-exists? (es-conn/connect (make-conn 404))
+                                "test_index")))
+
+      (is (= true
+             (sut/index-exists? (es-conn/connect (make-conn 200))
+                                "test_index")))
+
+      (is (thrown?
+           clojure.lang.ExceptionInfo
+           (sut/index-exists? (es-conn/connect (make-conn 401))
+                              "test_index"))))))
 
 (deftest ^:integration index-crud-ops
   (let [indexname "test_index"

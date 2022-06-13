@@ -59,24 +59,49 @@
 (s/defn close [conn :- ESConn]
   (-> conn :cm shutdown-manager))
 
+(defn ^:private unauthorized-request
+  [res]
+  (log/warn "Unauthorized ES Request:" res)
+  (throw (ex-info "Unauthorized ES Request"
+                  {:type ::unauthorized
+                   :es-http-res res})))
+
+(defn ^:private invalid-request
+  [res]
+  (log/warn "ES Invalid Request:" res)
+  (throw (ex-info "ES query parsing error"
+                  {:type ::invalid-request
+                   :es-http-res res})))
+
+(defn ^:private unknown-error
+  [res]
+  (log/warn "ES Unknown Error:" res)
+  (throw (ex-info "ES Unknown Error"
+                  {:type ::es-unknown-error
+                   :es-http-res res})))
+
+
 (defn safe-es-read [{:keys [status body]
                      :as res}]
   (case (int status)
     200 body
     201 body
     404 nil
-    401 (do (log/warn "Unauthorized ES Request:" res)
-            (throw (ex-info "Unauthorized ES Request"
-                            {:type ::unauthorized
-                             :es-http-res res})))
-    400 (do (log/warn "ES Invalid Request:" res)
-            (throw (ex-info "ES query parsing error"
-                            {:type ::invalid-request
-                             :es-http-res res})))
-    (do (log/warn "ES Unknown Error:" res)
-        (throw (ex-info "ES Unknown Error"
-                        {:type ::es-unknown-error
-                         :es-http-res res})))))
+    401 (unauthorized-request res)
+    400 (invalid-request res)
+    (unknown-error res)))
+
+(defn safe-es-read-head
+  "For use with HEAD requests. As opposed to safe-es-read, returns the status
+  instead of body or nil."
+  [{:keys [status]
+    :as res}]
+  (case (int status)
+    200 status
+    404 status
+    401 (unauthorized-request res)
+    400 (invalid-request res)
+    (unknown-error res)))
 
 (defn safe-es-bulk-read [body]
   (if (:errors body)

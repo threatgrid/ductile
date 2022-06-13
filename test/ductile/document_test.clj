@@ -161,12 +161,7 @@
                        :foo "bar is a lie"
                        :test_value 42}
            doc-type (if (= version 5) "test-type" "_doc")
-           sample-docs
-           (repeatedly 10
-                       #(hash-map :id (str (UUID/randomUUID))
-                                  :_index indexname
-                                  :bar "foo"
-                                  :_type doc-type))
+
            get-doc (fn [doc-id opts]
                      (sut/get-doc conn indexname doc-type doc-id opts))
            get-sample-doc #(get-doc (:id sample-doc) {})
@@ -180,7 +175,7 @@
            delete-doc (fn [doc-id opts]
                         (sut/delete-doc conn indexname doc-type doc-id opts))
 
-           update-doc (fn [doc-id doc opts]
+           update-doc (fn [doc-id doc _opts]
                         (sut/update-doc conn indexname doc-type doc-id doc {}))]
        (testing "create-doc and get-doc"
          (is (nil? (get-sample-doc)))
@@ -317,7 +312,7 @@
 (deftest format-bulk-res-test
   (let [bulk-res-errors (rand-bulk-response 2 true)
         bulk-res-ok (rand-bulk-response 4 false)
-        check-fn (fn [{:keys [msg bulk-res-list nb-items errors?]}]
+        check-fn (fn [{:keys [_msg bulk-res-list nb-items errors?]}]
                    (let [{:keys [took errors items]}
                          (sut/format-bulk-res (shuffle bulk-res-list))]
                      (is (= took (* 3 (count bulk-res-list))))

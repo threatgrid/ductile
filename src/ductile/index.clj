@@ -1,7 +1,7 @@
 (ns ductile.index
   (:refer-clojure :exclude [get])
   (:require [cemerick.uri :as uri]
-            [ductile.conn :refer [make-http-opts safe-es-read]]
+            [ductile.conn :refer [make-http-opts safe-es-read safe-es-read-head]]
             [ductile.schemas :refer [ESConn RolloverConditions CatIndices]]
             [schema.core :as s]
             [schema-tools.core :as st]))
@@ -47,12 +47,12 @@
   "check if the supplied ES index exists"
   [{:keys [uri request-fn] :as conn} :- ESConn
    index-name :- s/Str]
-  (not= 404
-        (-> (make-http-opts conn {})
-            (assoc :method :head
-                   :url (index-uri uri index-name))
-            request-fn
-            :status)))
+  (= 200
+     (-> (make-http-opts conn {})
+         (assoc :method :head
+                :url (index-uri uri index-name))
+         request-fn
+         safe-es-read-head)))
 
 (s/defn create!
   "create an index"
