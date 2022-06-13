@@ -56,9 +56,10 @@
              (sut/index-exists? (es-conn/connect (make-conn 200))
                                 "test_index")))
 
-      (is (= false
-             (sut/index-exists? (es-conn/connect (make-conn 412))
-                                "test_index"))))))
+      (is (thrown?
+           clojure.lang.ExceptionInfo
+           (sut/index-exists? (es-conn/connect (make-conn 401))
+                              "test_index"))))))
 
 (deftest ^:integration index-crud-ops
   (let [indexname "test_index"

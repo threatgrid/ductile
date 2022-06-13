@@ -1,7 +1,7 @@
 (ns ductile.index
   (:refer-clojure :exclude [get])
   (:require [cemerick.uri :as uri]
-            [ductile.conn :refer [make-http-opts safe-es-read]]
+            [ductile.conn :refer [make-http-opts safe-es-read safe-es-read-head]]
             [ductile.schemas :refer [ESConn RolloverConditions CatIndices]]
             [schema.core :as s]
             [schema-tools.core :as st]))
@@ -52,7 +52,7 @@
          (assoc :method :head
                 :url (index-uri uri index-name))
          request-fn
-         :status)))
+         safe-es-read-head)))
 
 (s/defn create!
   "create an index"
