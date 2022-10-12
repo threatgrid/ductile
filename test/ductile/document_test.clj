@@ -10,7 +10,8 @@
             [ring.util.codec :refer [form-decode]]
             [schema.test :refer [validate-schemas]])
   (:import clojure.lang.ExceptionInfo
-           [java.util UUID]))
+           [java.util UUID]
+           [java.io InputStream]))
 
 (use-fixtures :once validate-schemas)
 
@@ -859,7 +860,8 @@
 (deftest ^:encoding string->input-stream
   (testing "creates input stream containing UTF-8 representation of a string"
     (is (= (seq (.getBytes "qй" "UTF-8"))
-           (seq (loop [acc [] is (sut/string->input-stream "qй")]
+           (seq (loop [acc []
+                       ^InputStream is (sut/string->input-stream "qй")]
                   (let [b (.read is)]
                     (if (= -1 b)
                       acc

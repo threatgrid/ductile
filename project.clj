@@ -27,9 +27,9 @@
   :plugins [[lein-codox "0.10.7"]
             [lein-pprint "1.3.2"]]
   :target-path "target/%s"
-  :test-selectors {:default (complement :integration)
+  :test-selectors {:default (every-pred (complement :integration) (complement :encoding))
                    :integration :integration
-                   :all (constantly true)}
+                   :all (complement :encoding)}
   :profiles {:uberjar {:aot :all
                        :pedantic? :abort}
              :dev {:dependencies
@@ -39,7 +39,7 @@
              :test {:dependencies
                     ~test-deps
                     :resource-paths ["test/resources"]
-                    :pedantic? :warn}
+                    :pedantic? :abort}
              :test-encoding {:jvm-opts ["-Dfile.encoding=ANSI_X3.4-1968"]
                              :test-selectors ^:replace {:default :encoding}}}
   :global-vars {*warn-on-reflection* true})
