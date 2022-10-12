@@ -859,4 +859,8 @@
 (deftest ^:encoding string->input-stream
   (testing "creates input stream containing UTF-8 representation of a string"
     (is (= (seq (.getBytes "qй" "UTF-8"))
-           (seq (.readAllBytes (sut/string->input-stream "qй")))))))
+           (seq (loop [acc [] is (sut/string->input-stream "qй")]
+                  (let [b (.read is)]
+                    (if (= -1 b)
+                      acc
+                      (recur (conj acc (unchecked-byte b)) is)))))))))
