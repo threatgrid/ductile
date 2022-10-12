@@ -39,5 +39,7 @@
              :test {:dependencies
                     ~test-deps
                     :resource-paths ["test/resources"]
-                    :pedantic? :abort}}
+                    :pedantic? :warn}
+             :test-encoding {:jvm-opts ["-Dfile.encoding=ANSI_X3.4-1968"]
+                             :test-selectors ^:replace {:default :encoding}}}
   :global-vars {*warn-on-reflection* true})

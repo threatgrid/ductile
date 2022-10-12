@@ -850,3 +850,13 @@
                                 es-params)
              (pagination-params es7-result
                                 es-params))))))
+
+(deftest ^:encoding byte-size-test
+  (testing "calculation of string byte size respect UTF-8 encoding"
+    (is (= (count (.getBytes "qй" "UTF-8"))
+           (sut/byte-size "qй")))))
+
+(deftest ^:encoding string->input-stream
+  (testing "creates input stream containing UTF-8 representation of a string"
+    (is (= (seq (.getBytes "qй" "UTF-8"))
+           (seq (.readAllBytes (sut/string->input-stream "qй")))))))
