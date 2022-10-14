@@ -1,7 +1,7 @@
 language: clojure
 lein: 2.9.1
 dist: trusty
-script: lein do clean, javac, test :all
+script: lein do clean, javac, test :all, with-profile test-encoding test
 
 
 # Cache our Maven deps to be kind to clojars, github, docker images

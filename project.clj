@@ -4,7 +4,7 @@
 (def test-deps
   `[[ring/ring-codec ~ring-version]])
 
-(defproject threatgrid/ductile "0.4.5-SNAPSHOT"
+(defproject threatgrid/ductile "0.4.6-SNAPSHOT"
   :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
@@ -27,9 +27,9 @@
   :plugins [[lein-codox "0.10.7"]
             [lein-pprint "1.3.2"]]
   :target-path "target/%s"
-  :test-selectors {:default (complement :integration)
+  :test-selectors {:default (every-pred (complement :integration) (complement :encoding))
                    :integration :integration
-                   :all (constantly true)}
+                   :all (complement :encoding)}
   :profiles {:uberjar {:aot :all
                        :pedantic? :abort}
              :dev {:dependencies
@@ -39,5 +39,7 @@
              :test {:dependencies
                     ~test-deps
                     :resource-paths ["test/resources"]
-                    :pedantic? :abort}}
+                    :pedantic? :abort}
+             :test-encoding {:jvm-opts ["-Dfile.encoding=ANSI_X3.4-1968"]
+                             :test-selectors ^:replace {:default :encoding}}}
   :global-vars {*warn-on-reflection* true})

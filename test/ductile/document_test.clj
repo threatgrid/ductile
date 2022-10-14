@@ -10,7 +10,8 @@
             [ring.util.codec :refer [form-decode]]
             [schema.test :refer [validate-schemas]])
   (:import clojure.lang.ExceptionInfo
-           [java.util UUID]))
+           [java.util UUID]
+           [java.io InputStream]))
 
 (use-fixtures :once validate-schemas)
 
@@ -850,3 +851,18 @@
                                 es-params)
              (pagination-params es7-result
                                 es-params))))))
+
+(deftest ^:encoding byte-size-test
+  (testing "calculation of string byte size respect UTF-8 encoding"
+    (is (= (count (.getBytes "qй" "UTF-8"))
+           (sut/byte-size "qй")))))
+
+(deftest ^:encoding string->input-stream
+  (testing "creates input stream containing UTF-8 representation of a string"
+    (is (= (seq (.getBytes "qй" "UTF-8"))
+           (seq (loop [acc []
+                       ^InputStream is (sut/string->input-stream "qй")]
+                  (let [b (.read is)]
+                    (if (= -1 b)
+                      acc
+                      (recur (conj acc (unchecked-byte b)) is)))))))))

@@ -90,7 +90,7 @@
   "Count the size of the given string in bytes."
   [^String s]
   (when s
-    (count (.getBytes s))))
+    (count (.getBytes s "UTF-8"))))
 
 (defn format-bulk-doc-fn
   "helper to prepare a bulk operation"
@@ -136,7 +136,7 @@
 (defn string->input-stream
   [^String s]
   (-> s
-      (.getBytes)
+      (.getBytes "UTF-8")
       (ByteArrayInputStream.)))
 
 (defn ^:private bulk-post-docs
