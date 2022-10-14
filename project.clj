@@ -4,7 +4,7 @@
 (def test-deps
   `[[ring/ring-codec ~ring-version]])
 
-(defproject threatgrid/ductile "0.4.5-SNAPSHOT"
+(defproject threatgrid/ductile "0.4.5"
   :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
