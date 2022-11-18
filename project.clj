@@ -10,13 +10,11 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure ~clj-version]
-                 [org.clojure/tools.logging "0.5.0"]
-                 [prismatic/schema "1.1.12"]
-                 [metosin/schema-tools "0.12.2"]
-                 [clj-http "3.10.1"]
-                 [com.arohner/uri "0.1.2"]
-                 [cheshire "5.9.0"]
-                 [base64-clj "0.1.1"]]
+                 [org.clojure/tools.logging "1.2.4"]
+                 [prismatic/schema "1.4.1"]
+                 [metosin/schema-tools "0.12.3"]
+                 [clj-http "3.12.3"]
+                 [cheshire "5.11.0"]]
   ;; make `lein deploy` use clojars by default
   :deploy-repositories [["releases" :clojars]
                         ["snapshots" :clojars]]

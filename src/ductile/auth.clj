@@ -1,20 +1,22 @@
 (ns ductile.auth
   (:require [ductile.schemas :refer [AuthParams  ApiKey BasicAuth OAuthToken]]
-            [base64-clj.core :as b64]
             [clojure.string :as string]
-            [schema.core :as s]))
+            [schema.core :as s])
+  (:import (java.util Base64)))
+
+(defn- encode-base64 [^String st]
+  (.encodeToString (Base64/getEncoder) (.getBytes st "UTF-8")))
 
 (s/defn api-key-auth
   "Generates Elasticsearch API keys authorization headers.
    The key is the base64 encoding of `id` and `api_key` joined by a colon.
    https://www.elastic.co/guide/en/kibana/7.10/api-keys.html"
   [{key-id :id
-   :keys [api-key]} :- ApiKey]
-  {:headers
-   {:authorization
-    (->> (format "%s:%s" key-id api-key)
-         b64/encode
-         (str "ApiKey "))}})
+    :keys [api-key]} :- ApiKey]
+  (let [api-key (encode-base64 (format "%s:%s" key-id api-key))]
+    {:headers
+     {:authorization
+      (str "ApiKey " api-key)}}))
 
 (s/defn basic-auth
   "Generates basic auth clj-http params."
