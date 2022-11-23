@@ -84,6 +84,9 @@
        f))
    (reduce-kv
     (fn [acc index {:keys [defaults settings]}]
+      ;; NOTE by convention Elasticsearch indices
+      ;;      with a leading dot in the name
+      ;;      considered internal.
       (if (string/starts-with? (name index) ".")
         acc
         (assoc acc index (deep-merge settings defaults))))
