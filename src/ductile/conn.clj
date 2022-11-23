@@ -32,7 +32,8 @@
      (seq query-params-keys) (assoc :query-params
                                     (select-keys opts query-params-keys))))
   ([conn opts query-params-keys] (make-http-opts conn opts query-params-keys nil nil))
-  ([conn opts] (make-http-opts conn opts [] nil nil)))
+  ([conn opts] (make-http-opts conn opts [] nil nil))
+  ([conn] (make-http-opts conn {} [] nil nil)))
 
 (defn make-connection-manager [cm-options]
   (make-reusable-conn-manager cm-options))

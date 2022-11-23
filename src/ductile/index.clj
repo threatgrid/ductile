@@ -1,10 +1,14 @@
 (ns ductile.index
   (:refer-clojure :exclude [get])
-  (:require [ductile.uri :as uri]
-            [ductile.conn :refer [make-http-opts safe-es-read]]
-            [ductile.schemas :refer [ESConn RolloverConditions CatIndices]]
-            [schema.core :as s]
-            [schema-tools.core :as st]))
+  (:require
+   [clojure.edn :as edn]
+   [clojure.string :as string]
+   [clojure.walk :as walk]
+   [ductile.conn :refer [make-http-opts safe-es-read]]
+   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings]]
+   [ductile.uri :as uri]
+   [schema-tools.core :as st]
+   [schema.core :as s]))
 
 (s/defn index-uri :- s/Str
   "make an index uri from a host and an index name"
@@ -60,6 +64,49 @@
              :url (index-uri uri index-name))
       request-fn
       safe-es-read))
+
+(defn coerce [^String st]
+  (try
+    (let [v (edn/read-string st)]
+      (if (symbol? v) st v))
+    (catch Exception _ st)))
+
+(defn deep-merge [m1 m2]
+  (if (and (map? m1) (map? m2))
+    (merge-with deep-merge m1 m2)
+    (or m2 m1)))
+
+(defn merge-defaults [settings]
+  (walk/postwalk
+   (fn [f]
+     (if (string? f)
+       (coerce f)
+       f))
+   (reduce-kv
+    (fn [acc index {:keys [defaults settings]}]
+      ;; NOTE by convention Elasticsearch indices
+      ;;      with a leading dot in the name
+      ;;      considered internal.
+      (if (string/starts-with? (name index) ".")
+        acc
+        (assoc acc index (deep-merge settings defaults))))
+    {}
+    settings)))
+
+(s/defn get-settings :- ESSettings
+  "Extract settings of an `index` from ES cluster. If explicit `index` is not provided - uses `\"_all\"` as a target.
+   Result is a hash map of `index` -> `settings`, including defaults."
+  ([conn :- ESConn] (get-settings conn "_all"))
+  ([{:keys [uri request-fn] :as conn} :- ESConn
+    index :- s/Str]
+   (-> (make-http-opts conn)
+       (assoc :query-params {:include_defaults true
+                             :ignore_unavailable true}
+              :method :get
+              :url (uri/uri uri (uri/uri-encode index) "_settings"))
+       (request-fn)
+       (safe-es-read)
+       (merge-defaults))))
 
 (s/defn update-settings!
   "update an ES index settings"
@@ -212,16 +259,16 @@
 (defn ^:private format-cat
   [cat-res]
   (map #(-> %
-            (update :docs.count read-string)
-            (update :docs.deleted read-string)
-            (update :pri read-string)
-            (update :rep read-string))
+            (update :docs.count edn/read-string)
+            (update :docs.deleted edn/read-string)
+            (update :pri edn/read-string)
+            (update :rep edn/read-string))
        cat-res))
 
 (s/defn cat-indices :- (s/maybe CatIndices)
   "perform a _cat/indices request"
   [{:keys [uri request-fn] :as conn} :- ESConn]
-  (let [url (str uri "/_cat/indices?format=json&pretty=true&v=true")]
+  (let [url (str uri "/_cat/indices?format=json&v=true")]
     (-> (make-http-opts conn {})
         (assoc :method :get
                :url url)

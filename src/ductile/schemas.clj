@@ -117,3 +117,10 @@
   (st/optional-keys
    {:script ESScript
     :query  ESQuery}))
+
+(s/defschema ESIndexSettings
+  ;; TODO more precise schema for index settings
+  s/Any)
+
+(s/defschema ESSettings
+  {s/Keyword ESIndexSettings})
