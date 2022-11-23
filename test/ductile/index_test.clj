@@ -1,5 +1,7 @@
 (ns ductile.index-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [clojure.set :as set]
+            [clojure.string :as string]
             [ductile.document :as es-doc]
             [ductile.index :as sut]
             [ductile.test-helpers :refer [for-each-es-version]]
@@ -228,16 +230,15 @@
 (deftest ^:integration cat-indices-test
   (for-each-es-version
    "cat-indices shall properly return indices data"
-   #(sut/delete! conn "*")
-   (let [indices-names (->> (rand-int 10)
-                            inc
-                            range
-                            (map #(str "indexname" %)))]
-     (doseq [indexname indices-names]
+   #(sut/delete! conn "cat-indices-test-*")
+   (let [indices-names (into #{}
+                             (map #(str "cat-indices-test-" %))
+                             (range 10))]
+     (doseq [indexname (seq indices-names)]
        (sut/create! conn indexname {}))
-     (let [cat-res (sut/cat-indices conn)]
-       (is (= (count indices-names)
-              (count cat-res)))
-       (is (= (set indices-names)
-              (set (map :index cat-res))))
+     (let [cat-res (filter
+                    #(string/starts-with? (:index %) "cat-indices-test")
+                    (sut/cat-indices conn))]
+       (is (= 10 (count cat-res)))
+       (is (set/subset? indices-names (set (map :index cat-res))))
        (is (every? zero? (map :docs.count cat-res)))))))
