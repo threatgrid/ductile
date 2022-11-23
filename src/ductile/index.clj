@@ -1,6 +1,6 @@
 (ns ductile.index
   (:refer-clojure :exclude [get])
-  (:require [cemerick.uri :as uri]
+  (:require [ductile.uri :as uri]
             [ductile.conn :refer [make-http-opts safe-es-read]]
             [ductile.schemas :refer [ESConn RolloverConditions CatIndices]]
             [schema.core :as s]
@@ -10,18 +10,14 @@
   "make an index uri from a host and an index name"
   [uri :- s/Str
    index-name :- s/Str]
-  (format "%s/%s"
-          uri
-          (uri/uri-encode index-name)))
+  (uri/uri uri (uri/uri-encode index-name)))
 
 (s/defn template-uri :- s/Str
   "make a template uri from a host and a template name"
   [uri :- s/Str
    template-name :- s/Str]
   "make a template uri from a host and a template name"
-  (format "%s/_template/%s"
-          uri
-          (uri/uri-encode template-name)))
+  (uri/uri uri "_template" (uri/uri-encode template-name)))
 
 (s/defn rollover-uri :- s/Str
   "make a rollover uri from a host and an index name"
@@ -29,19 +25,15 @@
   ([uri :- s/Str
     alias :- s/Str
     new-index-name :- (s/maybe s/Str)
-    dry_run :- (s/maybe s/Bool)]
-   (cond-> (str (index-uri uri alias) "/_rollover")
-        new-index-name (str "/" (uri/uri-encode new-index-name))
-        dry_run (str "?dry_run"))))
+    dry-run :- (s/maybe s/Bool)]
+   (cond-> (uri/uri (index-uri uri alias) "_rollover" (uri/uri-encode new-index-name))
+     dry-run (str "?dry_run"))))
 
 (s/defn refresh-uri :- s/Str
   "make a refresh uri from a host, and optionally an index name"
   [uri :- s/Str
    index-name :- (s/maybe s/Str)]
-  (str uri
-       (when index-name
-         (str "/" (uri/uri-encode index-name)))
-       "/_refresh"))
+  (uri/uri uri (uri/uri-encode index-name) "_refresh"))
 
 (s/defn index-exists? :- s/Bool
   "check if the supplied ES index exists"
@@ -76,7 +68,7 @@
    settings :- s/Any]
   (-> (make-http-opts conn {} [] settings nil)
       (assoc :method :put
-             :url (str (index-uri uri index-name) "/_settings"))
+             :url (uri/uri (index-uri uri index-name) "_settings"))
       request-fn
       safe-es-read))
 
@@ -89,9 +81,7 @@
     mappings :- (s/pred map?)]
    (-> (make-http-opts conn {} [] mappings nil)
        (assoc :method :put
-              :url (-> (index-uri uri index-name)
-                       (uri/uri "_mapping" doc-type)
-                       str))
+              :url (uri/uri (index-uri uri index-name) "_mapping" (uri/uri-encode doc-type)))
        request-fn
        safe-es-read))
   ([conn :- ESConn
@@ -178,7 +168,7 @@
    index-name :- s/Str]
   (-> (make-http-opts conn {})
       (assoc :method :post
-             :url (str (index-uri uri index-name) "/_open"))
+             :url (uri/uri (index-uri uri index-name) "_open"))
       request-fn
       safe-es-read))
 
@@ -188,7 +178,7 @@
    index-name :- s/Str]
   (-> (make-http-opts conn {})
       (assoc :method :post
-             :url (str (index-uri uri index-name) "/_close"))
+             :url (uri/uri (index-uri uri index-name) "_close"))
       request-fn
       safe-es-read))
 

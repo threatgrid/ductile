@@ -1,5 +1,5 @@
 (ns ductile.document
-  (:require [cemerick.uri :as uri]
+  (:require [ductile.uri :as uri]
             [cheshire.core :as json]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
@@ -21,10 +21,10 @@
 (defn index-doc-uri
   "make an uri for document index"
   ([uri index-name doc-type id]
-   (str (uri/uri uri
-                 (uri/uri-encode index-name)
-                 (or (not-empty doc-type) "_doc")
-                 (uri/uri-encode id)))))
+   (uri/uri uri
+            (uri/uri-encode index-name)
+            (or (uri/uri-encode doc-type) "_doc")
+            (uri/uri-encode id))))
 
 (def delete-doc-uri
   "make an uri for doc deletion"
@@ -37,36 +37,32 @@
 (defn update-doc-uri
   "make an uri for document update"
   ([uri index-name id]
-   (str
-    (uri/uri uri
-             (uri/uri-encode index-name)
-             "_update"
-             (uri/uri-encode id))))
+   (uri/uri uri
+            (uri/uri-encode index-name)
+            "_update"
+            (uri/uri-encode id)))
   ([uri index-name doc-type id]
    (if doc-type
      (-> (index-doc-uri uri index-name doc-type id)
-         (str "/_update"))
+         (uri/uri "_update"))
      (update-doc-uri uri index-name id))))
 
 (defn bulk-uri
   "make an uri for bulk action"
   [uri]
-  (str (uri/uri uri "_bulk")))
+  (uri/uri uri "_bulk"))
 
 (defn search-uri
   "make an uri for search action"
   [uri index-name]
-  (cond-> uri
-    index-name (str "/" (uri/uri-encode index-name))
-    :else (str "/_search")))
+  (uri/uri uri (uri/uri-encode index-name) "_search"))
 
 (defn count-uri
   "make an uri for search action"
   [uri index-name]
-  (str
-   (uri/uri uri
-            (uri/uri-encode index-name)
-            "_count")))
+  (uri/uri uri
+           (uri/uri-encode index-name)
+           "_count"))
 
 (def ^:private special-operation-keys
   "all operations fields for a bulk operation"
@@ -401,7 +397,7 @@
 (s/defn delete-by-query-uri
   [uri index-names]
   (let [index (uri/uri-encode (string/join "," index-names))]
-    (str (uri/uri uri index "_delete_by_query"))))
+    (uri/uri uri index "_delete_by_query")))
 
 (s/defn delete-by-query
   "delete all documents that match a query in an index"
@@ -422,7 +418,7 @@
 (s/defn update-by-query-uri
   [uri index-names]
   (let [index (uri/uri-encode (string/join "," index-names))]
-    (str (uri/uri uri index "_update_by_query"))))
+    (uri/uri uri index "_update_by_query")))
 
 (s/defn update-by-query
   "Performs an update on every document in the data stream or index without modifying
