@@ -6,6 +6,8 @@ It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited sup
 
 ## Changes
 
+- 0.5.0
+  - Add: `ductile.index/get-settings` function to fetch actual index settings from ES cluster
 - 0.4.5
   - Fix: Ensure UTF-8 encoding for bulk insert operations
 - 0.4.4
