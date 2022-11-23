@@ -242,3 +242,25 @@
        (is (= 10 (count cat-res)))
        (is (set/subset? indices-names (set (map :index cat-res))))
        (is (every? zero? (map :docs.count cat-res)))))))
+
+(deftest ^:integration fetch-test
+  (let [indices (cons "settings-test-fetch"
+                      (map #(str "settings-test-fetch-" %) (range 10)))]
+    (for-each-es-version
+     "fetch shall properly return settings"
+     #(sut/delete! conn "settings-test-*")
+
+     (doseq [index indices]
+       (sut/create! conn index {}))
+
+     (testing "fetch settings of specific index"
+       (let [{:keys [settings-test-fetch]} (sut/get-settings conn "settings-test-fetch")]
+         (is (= 10000 (get-in settings-test-fetch [:index :max_result_window]))))
+       (sut/update-settings! conn "settings-test-fetch" {:max_result_window 20})
+       (let [{:keys [settings-test-fetch]} (sut/get-settings conn)]
+         (is (= 20 (get-in settings-test-fetch [:index :max_result_window])))))
+
+     (testing "fetch settings of all indices"
+       (let [res (sut/get-settings conn)]
+         (is (= (set (map keyword indices))
+                (set (keys res)))))))))
