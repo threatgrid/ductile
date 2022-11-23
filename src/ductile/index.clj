@@ -4,7 +4,8 @@
             [ductile.conn :refer [make-http-opts safe-es-read]]
             [ductile.schemas :refer [ESConn RolloverConditions CatIndices]]
             [schema.core :as s]
-            [schema-tools.core :as st]))
+            [schema-tools.core :as st]
+            [clojure.edn :as edn]))
 
 (s/defn index-uri :- s/Str
   "make an index uri from a host and an index name"
@@ -212,16 +213,16 @@
 (defn ^:private format-cat
   [cat-res]
   (map #(-> %
-            (update :docs.count read-string)
-            (update :docs.deleted read-string)
-            (update :pri read-string)
-            (update :rep read-string))
+            (update :docs.count edn/read-string)
+            (update :docs.deleted edn/read-string)
+            (update :pri edn/read-string)
+            (update :rep edn/read-string))
        cat-res))
 
 (s/defn cat-indices :- (s/maybe CatIndices)
   "perform a _cat/indices request"
   [{:keys [uri request-fn] :as conn} :- ESConn]
-  (let [url (str uri "/_cat/indices?format=json&pretty=true&v=true")]
+  (let [url (str uri "/_cat/indices?format=json&v=true")]
     (-> (make-http-opts conn {})
         (assoc :method :get
                :url url)
