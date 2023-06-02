@@ -124,3 +124,11 @@
 
 (s/defschema ESSettings
   {s/Keyword ESIndexSettings})
+
+(s/defschema PolicyPhases
+  {(s/enum :hot :warm :cold :frozen :delete) {s/Keyword s/Any}})
+
+(s/defschema Policy
+  {:policy
+   (st/open-schema
+    {:phases PolicyPhases})})
