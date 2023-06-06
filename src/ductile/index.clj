@@ -45,7 +45,6 @@
    policy-name :- s/Str]
   (uri/uri uri "_ilm/policy" (uri/uri-encode policy-name)))
 
-
 (s/defn create-policy!
   [{:keys [uri version request-fn] :as conn} :- ESConn
    policy-name :- s/Str
@@ -55,9 +54,31 @@
   (-> (make-http-opts conn
                       {}
                       []
-                      policy
+                      {:policy policy}
                       nil)
       (assoc :method :put
+             :url (policy-uri uri policy-name))
+      request-fn
+      safe-es-read))
+
+(s/defn delete-policy!
+  [{:keys [uri version request-fn] :as conn} :- ESConn
+   policy-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot delete policiy for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn)
+      (assoc :method :delete
+             :url (policy-uri uri policy-name))
+      request-fn
+      safe-es-read))
+
+(s/defn get-policy
+  [{:keys [uri version request-fn] :as conn} :- ESConn
+   policy-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot get policiy for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn)
+      (assoc :method :get
              :url (policy-uri uri policy-name))
       request-fn
       safe-es-read))

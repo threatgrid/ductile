@@ -129,6 +129,5 @@
   {(s/enum :hot :warm :cold :frozen :delete) {s/Keyword s/Any}})
 
 (s/defschema Policy
-  {:policy
-   (st/open-schema
-    {:phases PolicyPhases})})
+  (st/open-schema
+   {:phases PolicyPhases}))

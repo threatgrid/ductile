@@ -47,21 +47,33 @@
     (is (= (sut/policy-uri "http://127.0.0.1" "test-policy")
            "http://127.0.0.1/_ilm/policy/test-policy"))))
 
-(deftest ^:integration create-policy!-test
+(deftest ^:integration policy-test
   (let [policy-name "test-policy"
-        policy {:policy
-                {:phases
-                 {:hot
-                  {:actions
-                   {:rollover {:max_docs 100000000}}}}}}]
+        policy {:phases
+                {:hot
+                 {:min_age "0ms"
+                  :actions
+                  {:rollover {:max_docs 100000000}}}}}]
     (for-each-es-version
-     "Policy operations"
-     nil ;; TODO delete
+     "Policy operations should be available for ES >= 7"
+     (when (< 7 version) (sut/delete-policy! conn policy-name))
      (if (< version 7)
-       (is (thrown? ExceptionInfo
-                    (sut/create-policy! conn policy-name policy)))
-       (is (= {:acknowledged true}
-              (sut/create-policy! conn policy-name policy)))))))
+       (do
+         (is (thrown? ExceptionInfo
+                      (sut/create-policy! conn policy-name policy)))
+         (is (thrown? ExceptionInfo
+                      (sut/delete-policy! conn policy-name)))
+         (is (thrown? ExceptionInfo
+                      (sut/get-policy conn policy-name))))
+       (do
+         (is (= {:acknowledged true}
+                (sut/create-policy! conn policy-name policy)))
+
+         (is (= policy
+                (get-in (sut/get-policy conn policy-name)
+                        [(keyword policy-name) :policy])))
+         (is (= {:acknowledged true}
+                (sut/delete-policy! conn policy-name))))))))
 
 (deftest ^:integration index-crud-ops
   (let [indexname "test_index"
