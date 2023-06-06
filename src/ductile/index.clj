@@ -21,7 +21,7 @@
   [uri :- s/Str
    template-name :- s/Str]
   "make a template uri from a host and a template name"
-  (uri/uri uri "_index_template" (uri/uri-encode template-name)))
+  (uri/uri uri "_template" (uri/uri-encode template-name)))
 
 (s/defn rollover-uri :- s/Str
   "make a rollover uri from a host and an index name"
