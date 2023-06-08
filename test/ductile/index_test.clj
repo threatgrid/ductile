@@ -68,7 +68,6 @@
        (do
          (is (= {:acknowledged true}
                 (sut/create-policy! conn policy-name policy)))
-
          (is (= policy
                 (get-in (sut/get-policy conn policy-name)
                         [(keyword policy-name) :policy])))
