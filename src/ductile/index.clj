@@ -23,6 +23,13 @@
   "make a template uri from a host and a template name"
   (uri/uri uri "_template" (uri/uri-encode template-name)))
 
+(s/defn index-template-uri :- s/Str
+  "make an index template uri from a host and a template name"
+  [uri :- s/Str
+   template-name :- s/Str]
+  "make an index template uri from a host and a template name"
+  (uri/uri uri "_index_template" (uri/uri-encode template-name)))
+
 (s/defn rollover-uri :- s/Str
   "make a rollover uri from a host and an index name"
   ([uri alias] (rollover-uri uri alias nil false))
@@ -239,6 +246,43 @@
   (-> (make-http-opts conn {})
       (assoc :method :delete
              :url (template-uri uri index-name))
+      request-fn
+      safe-es-read))
+
+(s/defn get-index-template
+  "get an index template"
+  [{:keys [uri request-fn version] :as conn} :- ESConn
+   index-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot get index-template for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn {})
+      (assoc :method :get
+             :url (index-template-uri uri index-name))
+      request-fn
+      safe-es-read))
+
+(s/defn create-index-template!
+  "create an index template, update if already exists"
+  [{:keys [uri request-fn version] :as conn} :- ESConn
+   template-name :- s/Str
+   template]
+  (when (< version 7)
+    (throw (ex-info "Cannot create index-template for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn {} nil template nil)
+      (assoc :method :put
+             :url (index-template-uri uri template-name))
+      request-fn
+      safe-es-read))
+
+(s/defn delete-index-template!
+  "delete a template"
+  [{:keys [uri request-fn version] :as conn} :- ESConn
+   index-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot delete index-template for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn {})
+      (assoc :method :delete
+             :url (index-template-uri uri index-name))
       request-fn
       safe-es-read))
 
