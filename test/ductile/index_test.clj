@@ -72,7 +72,8 @@
                 (get-in (sut/get-policy conn policy-name)
                         [(keyword policy-name) :policy])))
          (is (= {:acknowledged true}
-                (sut/delete-policy! conn policy-name))))))))
+                (sut/delete-policy! conn policy-name)))
+         (is (= nil (sut/get-policy conn policy-name))))))))
 
 (deftest ^:integration index-crud-ops
   (let [indexname "test_index"
