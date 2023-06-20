@@ -5,7 +5,7 @@
    [clojure.string :as string]
    [clojure.walk :as walk]
    [ductile.conn :refer [make-http-opts safe-es-read]]
-   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings]]
+   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings Policy]]
    [ductile.uri :as uri]
    [schema-tools.core :as st]
    [schema.core :as s]))
@@ -38,6 +38,50 @@
   [uri :- s/Str
    index-name :- (s/maybe s/Str)]
   (uri/uri uri (uri/uri-encode index-name) "_refresh"))
+
+(s/defn policy-uri
+  "make a policy uri from a host, and optionally an index name"
+  [uri :- s/Str
+   policy-name :- s/Str]
+  (uri/uri uri "_ilm/policy" (uri/uri-encode policy-name)))
+
+(s/defn create-policy!
+  [{:keys [uri version request-fn] :as conn} :- ESConn
+   policy-name :- s/Str
+   policy :- Policy]
+  (when (< version 7)
+    (throw (ex-info "Cannot create policiy for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn
+                      {}
+                      []
+                      {:policy policy}
+                      nil)
+      (assoc :method :put
+             :url (policy-uri uri policy-name))
+      request-fn
+      safe-es-read))
+
+(s/defn delete-policy!
+  [{:keys [uri version request-fn] :as conn} :- ESConn
+   policy-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot delete policiy for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn)
+      (assoc :method :delete
+             :url (policy-uri uri policy-name))
+      request-fn
+      safe-es-read))
+
+(s/defn get-policy
+  [{:keys [uri version request-fn] :as conn} :- ESConn
+   policy-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot get policiy for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn)
+      (assoc :method :get
+             :url (policy-uri uri policy-name))
+      request-fn
+      safe-es-read))
 
 (s/defn index-exists? :- s/Bool
   "check if the supplied ES index exists"

@@ -6,7 +6,7 @@
             [ductile.index :as sut]
             [ductile.test-helpers :refer [for-each-es-version]]
             [schema.test :refer [validate-schemas]])
-  (:import java.util.UUID))
+  (:import java.util.UUID clojure.lang.ExceptionInfo))
 
 (use-fixtures :once validate-schemas)
 
@@ -41,6 +41,39 @@
            "http://127.0.0.1/test-index/_refresh"))
     (is (= (sut/refresh-uri "http://127.0.0.1" nil)
            "http://127.0.0.1/_refresh"))))
+
+(deftest policy-uri-test
+  (testing "should generate a proper policy URI"
+    (is (= (sut/policy-uri "http://127.0.0.1" "test-policy")
+           "http://127.0.0.1/_ilm/policy/test-policy"))))
+
+(deftest ^:integration policy-test
+  (let [policy-name "test-policy"
+        policy {:phases
+                {:hot
+                 {:min_age "0ms"
+                  :actions
+                  {:rollover {:max_docs 100000000}}}}}]
+    (for-each-es-version
+     "Policy operations should be available for ES >= 7"
+     (when (< 7 version) (sut/delete-policy! conn policy-name))
+     (if (< version 7)
+       (do
+         (is (thrown? ExceptionInfo
+                      (sut/create-policy! conn policy-name policy)))
+         (is (thrown? ExceptionInfo
+                      (sut/delete-policy! conn policy-name)))
+         (is (thrown? ExceptionInfo
+                      (sut/get-policy conn policy-name))))
+       (do
+         (is (= {:acknowledged true}
+                (sut/create-policy! conn policy-name policy)))
+         (is (= policy
+                (get-in (sut/get-policy conn policy-name)
+                        [(keyword policy-name) :policy])))
+         (is (= {:acknowledged true}
+                (sut/delete-policy! conn policy-name)))
+         (is (= nil (sut/get-policy conn policy-name))))))))
 
 (deftest ^:integration index-crud-ops
   (let [indexname "test_index"
