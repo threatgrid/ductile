@@ -24,6 +24,13 @@
     (is (= (sut/template-uri "http://127.0.0.1" "testé")
            "http://127.0.0.1/_template/test%C3%A9"))))
 
+(deftest index-template-uri-test
+  (testing "should generate a valid index template URI"
+    (is (= (sut/index-template-uri "http://127.0.0.1" "test")
+           "http://127.0.0.1/_index_template/test"))
+    (is (= (sut/index-template-uri "http://127.0.0.1" "testé")
+           "http://127.0.0.1/_index_template/test%C3%A9"))))
+
 (deftest rollover-uri-test
   (testing "should generate a valid rollover URI"
     (is (= (sut/rollover-uri "http://127.0.0.1" "test")
@@ -259,6 +266,52 @@
             (sut/delete-template! conn template-name-2)))
      (is (nil? (sut/get-template conn template-name-1)))
      (is (nil? (sut/get-template conn template-name-2))))))
+
+(deftest ^:integration index-template-test
+  (for-each-es-version
+   "index-template crud operations should trigger valid _index_template requests"
+   nil
+   (let [template-name "template-test"
+         alias1 :alias1
+         alias2 :alias2
+         index-template {:index_patterns ["pattern1" "pattern2"]
+                         :template {:settings {:number_of_shards "1"
+                                               :refresh_interval "2s"}
+                                    :mappings {:_source {:enabled false}}
+                                    :aliases {alias1 {}
+                                              alias2 {:filter {:term {:user "kimchy"}}
+                                                      :routing "kimchy"}}}}]
+     (if (< version 7)
+       (do
+         (is (thrown? ExceptionInfo
+                      (sut/create-index-template! conn template-name index-template)))
+         (is (thrown? ExceptionInfo
+                      (sut/get-index-template conn template-name)))
+         (is (thrown? ExceptionInfo
+                      (sut/delete-index-template! conn template-name))))
+       (let [_ (is (= {:acknowledged true}
+                      (sut/create-index-template! conn
+                                                  template-name
+                                                  index-template)))]
+         (is (= {:index_templates
+                 [{:name "template-test",
+                   :index_template
+                   {:index_patterns ["pattern1" "pattern2"],
+                    :template
+                    {:settings
+                     {:index {:number_of_shards "1", :refresh_interval "2s"}},
+                     :mappings {:_source {:enabled false}},
+                     :aliases
+                     {:alias1 {},
+                      :alias2
+                      {:filter {:term {:user "kimchy"}},
+                       :index_routing "kimchy",
+                       :search_routing "kimchy"}}},
+                    :composed_of []}}]}
+                (sut/get-index-template conn template-name)))
+         (is (= {:acknowledged true}
+                (sut/delete-index-template! conn template-name)))
+         (is (nil? (sut/get-index-template conn template-name))))))))
 
 (deftest ^:integration cat-indices-test
   (for-each-es-version
