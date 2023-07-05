@@ -47,10 +47,49 @@
   (uri/uri uri (uri/uri-encode index-name) "_refresh"))
 
 (s/defn policy-uri
-  "make a policy uri from a host, and optionally an index name"
+  "make a policy uri from a host, and a policy name"
   [uri :- s/Str
    policy-name :- s/Str]
   (uri/uri uri "_ilm/policy" (uri/uri-encode policy-name)))
+
+(s/defn data-stream-uri
+  "make a datastral uri from a host, and a data stream name"
+  [uri :- s/Str
+   data-stream-name :- s/Str]
+  (uri/uri uri "_data_stream" (uri/uri-encode data-stream-name)))
+
+(s/defn create-data-stream!
+  [{:keys [uri version request-fn] :as conn} :- ESConn
+   data-stream-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot create datastream for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn)
+      (assoc :method :put
+             :url (data-stream-uri uri data-stream-name))
+      request-fn
+      safe-es-read))
+
+(s/defn delete-data-stream!
+  [{:keys [uri version request-fn] :as conn} :- ESConn
+   data-stream-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot delete data stream for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn)
+      (assoc :method :delete
+             :url (data-stream-uri uri data-stream-name))
+      request-fn
+      safe-es-read))
+
+(s/defn get-data-stream
+  [{:keys [uri version request-fn] :as conn} :- ESConn
+   data-stream-name :- s/Str]
+  (when (< version 7)
+    (throw (ex-info "Cannot get data stream for Elasticsearch version < 7" conn)))
+  (-> (make-http-opts conn)
+      (assoc :method :get
+             :url (data-stream-uri uri data-stream-name))
+      request-fn
+      safe-es-read))
 
 (s/defn create-policy!
   [{:keys [uri version request-fn] :as conn} :- ESConn
