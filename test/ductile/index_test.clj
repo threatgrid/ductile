@@ -343,8 +343,9 @@
                  "data-stream must match an index template in order to be created")
          (is (= {:acknowledged true}
                 (sut/create-data-stream! conn data-stream-name)))
-         (is (= nil
-                (sut/get-data-stream conn data-stream-name)))
+         (is (= data-stream-name
+                (get-in (sut/get-data-stream conn data-stream-name)
+                        [:data_streams 0 :name])))
          (is (= {:acknowledged true}
                 (sut/delete-data-stream! conn data-stream-name)))
          (is (= nil (sut/get-data-stream conn data-stream-name))))))))
