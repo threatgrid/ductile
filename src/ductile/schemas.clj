@@ -56,6 +56,8 @@
    (st/optional-keys
     {:refresh Refresh
      :retry_on_conflict s/Int
+     :if_seq_no s/Int
+     :if_primary_term s/Int
      :wait_for_completion s/Bool
      :_source (s/cond-pre s/Bool [s/Str])
      :mk-id (s/=> s/Any s/Any)

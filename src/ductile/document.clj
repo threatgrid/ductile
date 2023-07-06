@@ -290,7 +290,7 @@
     :or {mk-id :id}
     :as opts} :- CRUDOptions]
   (let [doc-id (mk-id doc)
-        valid-opts (cond-> [:refresh]
+        valid-opts (cond-> [:refresh :if_seq_no :if_primary_term]
                      ;; es5 does not allow op_type=create when no id is provided
                      ;; https://github.com/elastic/elasticsearch/issues/21535#issuecomment-260467699
                      doc-id (conj :op_type))
@@ -342,14 +342,13 @@
                            (into {:_source true
                                   :retry_on_conflict default-retry-on-conflict}
                                  opts)
-                           [:_source :retry_on_conflict :refresh]
+                           [:_source :retry_on_conflict :refresh :if_seq_no :if_primary_term]
                            {:doc doc}
                            nil)
       (assoc :method :post
              :url uri)
       request-fn
-      conn/safe-es-read
-      (get-in [:get :_source])))
+      conn/safe-es-read))
 
 (s/defn update-doc
   "update a document on es return the updated document"
