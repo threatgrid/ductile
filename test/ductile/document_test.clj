@@ -219,16 +219,18 @@
                update2 {:test_value 55}
                updated-doc2 (into sample-doc update2)]
            (is (= updated-doc1
-                  (update-doc (:id sample-doc)
-                              update1
-                              {:refresh "true"})))
+                  (get-in (update-doc (:id sample-doc)
+                                      update1
+                                      {:refresh "true"})
+                          [:get :_source])))
            (is (= updated-doc1 (get-sample-doc)))
            (testing "with params"
              (is (= updated-doc2
-                    (update-doc (:id sample-doc)
-                                update2
-                                {:refresh "true"
-                                 :retry_on_conflict 10})))
+                    (get-in (update-doc (:id sample-doc)
+                                        update2
+                                        {:refresh "true"
+                                         :retry_on_conflict 10})
+                            [:get :_source])))
              (is (= updated-doc2 (get-sample-doc))))))
        (testing "index-doc"
          (testing "updating a field"

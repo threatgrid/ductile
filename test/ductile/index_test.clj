@@ -54,6 +54,11 @@
     (is (= (sut/policy-uri "http://127.0.0.1" "test-policy")
            "http://127.0.0.1/_ilm/policy/test-policy"))))
 
+(deftest data-stream-uri-test
+  (testing "should generate a proper data stream URI"
+    (is (= (sut/data-stream-uri "http://127.0.0.1" "test-data-stream")
+           "http://127.0.0.1/_data_stream/test-data-stream"))))
+
 (deftest ^:integration policy-test
   (let [policy-name "test-policy"
         policy {:phases
@@ -312,6 +317,38 @@
          (is (= {:acknowledged true}
                 (sut/delete-index-template! conn template-name)))
          (is (nil? (sut/get-index-template conn template-name))))))))
+
+(deftest ^:integration data-stream-test
+  (let [data-stream-name "test-data-stream"
+        index-template {:index_patterns [(str data-stream-name "*")]
+                        :data_stream {}
+                        :template {:settings {:number_of_shards "1"
+                                              :number_of_replicas "0"}}}]
+    (for-each-es-version
+     "data-stream operations should be available for ES >= 7"
+     (when (< 7 version) (sut/delete-data-stream! conn data-stream-name))
+     (if (< version 7)
+       (do
+         (is (thrown? ExceptionInfo
+                      (sut/create-data-stream! conn data-stream-name)))
+         (is (thrown? ExceptionInfo
+                      (sut/delete-data-stream! conn data-stream-name)))
+         (is (thrown? ExceptionInfo
+                      (sut/get-data-stream conn data-stream-name))))
+       (do
+         (assert (= {:acknowledged true}
+                    (sut/create-index-template! conn
+                                                data-stream-name
+                                                index-template))
+                 "data-stream must match an index template in order to be created")
+         (is (= {:acknowledged true}
+                (sut/create-data-stream! conn data-stream-name)))
+         (is (= data-stream-name
+                (get-in (sut/get-data-stream conn data-stream-name)
+                        [:data_streams 0 :name])))
+         (is (= {:acknowledged true}
+                (sut/delete-data-stream! conn data-stream-name)))
+         (is (= nil (sut/get-data-stream conn data-stream-name))))))))
 
 (deftest ^:integration cat-indices-test
   (for-each-es-version
