@@ -652,6 +652,7 @@
                                              [indexname1]
                                              q-term
                                              {:wait_for_completion true
+                                              :slices "auto"
                                               :refresh "true"})))
            "delete-by-query should delete all documents that match a query for given index")
        (is (= 6
@@ -659,6 +660,7 @@
                                              [indexname1, indexname2]
                                              q-ids-1
                                              {:wait_for_completion true
+                                              :slices "auto"
                                               :refresh "true"})))
            "delete-by-query should properly apply deletion on all given indices")
        (is (seq (:task (sut/delete-by-query conn

@@ -406,7 +406,7 @@
    opts :- CRUDOptions]
   (-> (conn/make-http-opts conn
                            opts
-                           [:refresh :wait_for_completion]
+                           [:refresh :wait_for_completion :slices]
                            {:query q}
                            nil)
       (assoc :method :post
@@ -428,7 +428,7 @@
    opts :- CRUDOptions]
   (-> (conn/make-http-opts conn
                            opts
-                           [:refresh :wait_for_completion :conflicts]
+                           [:refresh :wait_for_completion :conflicts :slices]
                            (or form-params {})
                            {})
       (assoc :method :post
