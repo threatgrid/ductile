@@ -642,7 +642,10 @@
                                (range 10))
            q-term (query/term :foo :bar2)
            q-ids-1 (query/ids ["0" "1" "2"])
-           q-ids-2 (query/ids ["3" "4"])]
+           q-ids-2 (query/ids ["3" "4"])
+           base-params (cond-> {:wait_for_completion true
+                                :refresh "true"}
+                         (= 7 version) (assoc :slices "auto"))]
        (es-index/delete! conn indexname)
        (es-index/create! conn indexname {})
        (sut/bulk-create-docs conn sample-docs-1 {:refresh "true"})
@@ -651,21 +654,18 @@
               (:deleted (sut/delete-by-query conn
                                              [indexname1]
                                              q-term
-                                             {:wait_for_completion true
-                                              :refresh "true"})))
+                                             base-params)))
            "delete-by-query should delete all documents that match a query for given index")
        (is (= 6
               (:deleted (sut/delete-by-query conn
                                              [indexname1, indexname2]
                                              q-ids-1
-                                             {:wait_for_completion true
-                                              :refresh "true"})))
+                                             base-params)))
            "delete-by-query should properly apply deletion on all given indices")
        (is (seq (:task (sut/delete-by-query conn
                                             [indexname1, indexname2]
                                             q-ids-2
-                                            {:wait_for_completion false
-                                             :refresh "true"})))
+                                            (assoc base-params :wait_for_completion false))))
            "delete-by-query with wait-for-completion? set to false should directly return an answer before deletion with a task id")))))
 
 (deftest ^:integration update-by-query-test
