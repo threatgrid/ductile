@@ -1,5 +1,7 @@
 # Ductile
 
+[![Clojars Project](https://img.shields.io/clojars/v/threatgrid/ductile.svg)](https://clojars.org/threatgrid/ductile)
+
 A minimalist clojure library for Elasticsearch REST API.
 
 It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited support to prior Elasticsearch version (5 and 6) through a compatibility mode that is more intended to help migrating data.
@@ -8,7 +10,7 @@ It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited sup
 
 - 0.4.5
   - Fix: Ensure UTF-8 encoding for bulk insert operations
-- 0.4.4
+- 0.4.4:
   - Fix: preserve field order when sorting by multiple fields
 - 0.4.3: bad version (failed deployment)
 
