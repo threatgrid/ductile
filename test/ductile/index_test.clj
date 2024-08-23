@@ -387,3 +387,47 @@
        (let [res (sut/get-settings conn)]
          (is (= (set (map keyword indices))
                 (set (keys res)))))))))
+
+(deftest ^:integration alias-actions-test
+  (let [indexname "test_index"
+        indexkw (keyword indexname)]
+    (for-each-es-version
+     "all ES Index CRUD operations"
+     #(sut/delete! conn indexname)
+     (let [doc-type (when (= 5 version) :sighting)
+           base-mappings (cond->> {:properties {:name {:type "text"}
+                                                :age {:type "integer"}}}
+                           (= version 5) (assoc {} doc-type))
+           base-settings {:number_of_shards "1"
+                          :number_of_replicas "1"}
+           index-create-res
+           (sut/create! conn
+                        indexname
+                        {:mappings base-mappings
+                         :settings base-settings})
+           test-cases [{:message "add aliases"
+                        :actions [{:add {:index indexname :alias "alias1"}}
+                                  {:add {:index indexname :alias "alias2"}}]}
+                       {:message "remove and add"
+                        :actions [{:remove {:index indexname :alias "alias1"}}
+                                  {:add {:index indexname :alias "alias3"}}]}
+                       {:message "add is_write_index to an existing index and add a new one"
+                        :es-versions #{7}
+                        :actions [{:add {:index indexname :alias "alias3" :is_write_index true}}
+                                  {:add {:index indexname :alias "alias4" :is_write_index true}}]}]
+           check-action (fn [action]
+                          (let [[action-type action-params] (first action)
+                                index (sut/get conn indexname)
+                                index-alias (first (filter #(= (name (first %)) (:alias action-params))
+                                                           (get-in index [indexkw :aliases])))]
+                            (case action-type
+                              :add (is (seq index-alias))
+                              :remove (is (nil? index-alias)))))]
+       (doseq [{:keys [message es-versions actions]
+                :or {es-versions #{5 7}}} test-cases]
+         (when (contains? (set es-versions) version)
+           (testing message
+             (is (= {:acknowledged true}
+                    (sut/alias-actions! conn actions)))
+             (doseq [action actions]
+               (check-action action)))))))))
