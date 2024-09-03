@@ -17,9 +17,6 @@
 
 (deftest search-uri-test
   (testing "should generate a valid _search uri"
-    (is (= "http://localhost:9200/ctia_tool/_search"
-           (sut/search-uri "http://localhost:9200"
-                           "ctia_tool")))
     (is (= "http://localhost:9200/_search"
            (sut/search-uri "http://localhost:9200"
                            nil)))))
@@ -49,13 +46,7 @@
                               "test_index"
                               ""
                               "test"))
-        "index-doc-uri should buir an ES7 comptatible uri when the type is an empty string")
-    (is (= "http://127.0.0.1/test-index/test-type/test-id"
-           (sut/index-doc-uri "http://127.0.0.1"
-                              "test-index"
-                              "test-type"
-                              "test-id"))
-        "index-doc-uri should build ES5 document uris when a non empty type is provided")))
+        "index-doc-uri should buir an ES7 comptatible uri when the type is an empty string")))
 
 (deftest update-doc-uri-test
   (is (= (sut/update-doc-uri "http://127.0.0.1"
@@ -65,13 +56,7 @@
                              "test-index"
                              nil
                              "test-id")
-         "http://127.0.0.1/test-index/_update/test-id"))
-  (is (= (sut/update-doc-uri "http://127.0.0.1"
-                             "test-index"
-                             "test-type"
-                             "test-id")
-         "http://127.0.0.1/test-index/test-type/test-id/_update")
-      "update-doc-uri should build ES5 _update uris when type is provided"))
+         "http://127.0.0.1/test-index/_update/test-id")))
 
 (deftest params->pagination-test
   (is (= {:size 100
@@ -161,35 +146,32 @@
      (let [sample-doc {:id "test_doc"
                        :foo "bar is a lie"
                        :test_value 42}
-           doc-type (if (= version 5) "test-type" "_doc")
            sample-docs
            (repeatedly 10
                        #(hash-map :id (str (UUID/randomUUID))
                                   :_index indexname
-                                  :bar "foo"
-                                  :_type doc-type))
+                                  :bar "foo"))
            get-doc (fn [doc-id opts]
-                     (sut/get-doc conn indexname doc-type doc-id opts))
+                     (sut/get-doc conn indexname doc-id opts))
            get-sample-doc #(get-doc (:id sample-doc) {})
 
            create-doc (fn [doc opts]
-                        (sut/create-doc conn indexname doc-type doc opts))
+                        (sut/create-doc conn indexname doc opts))
 
            index-doc (fn [doc opts]
-                       (sut/index-doc conn indexname doc-type doc opts))
+                       (sut/index-doc conn indexname doc opts))
 
            delete-doc (fn [doc-id opts]
-                        (sut/delete-doc conn indexname doc-type doc-id opts))
+                        (sut/delete-doc conn indexname doc-id opts))
 
            update-doc (fn [doc-id doc opts]
-                        (sut/update-doc conn indexname doc-type doc-id doc {}))]
+                        (sut/update-doc conn indexname doc-id doc {}))]
        (testing "create-doc and get-doc"
          (is (nil? (get-sample-doc)))
          (is (= {:_id (-> sample-doc :id str)
-                 :_type doc-type
                  :result "created"}
                 (select-keys (create-doc sample-doc {:refresh "true"})
-                             [:_id :_type :result])))
+                             [:_id :result])))
          (is (= sample-doc (get-sample-doc)))
          (testing "creating without id"
            (let [wo-id-doc (dissoc sample-doc :id)
@@ -350,13 +332,11 @@
     (for-each-es-version
      "all ES Document Bulk operations"
      #(es-index/delete! conn indexname)
-     (let [doc-type (if (= version 5) "test-type" "_doc")
-           nb-sample-docs 1000
+     (let [nb-sample-docs 1000
            sample-docs (->> (repeatedly nb-sample-docs
                                         #(hash-map :id (str (UUID/randomUUID))
                                                    :_index indexname
-                                                   :bar "foo"
-                                                   :_type doc-type))
+                                                   :bar "foo"))
                             (map #(assoc % :_id (:id %))))
            [to-create-docs to-index-docs] (partition-all-2 sample-docs)
            [to-update-docs to-delete-docs] (partition-all-2 (shuffle sample-docs))
@@ -456,16 +436,10 @@
        (es-index/delete! conn indexname)
        (es-index/create! conn indexname {})
        (doseq [doc docs]
-         (if (= version 5)
-           (sut/create-doc conn
-                           indexname
-                           "doc-type"
-                           doc
-                           {:refresh "true"})
-           (sut/create-doc conn
-                           indexname
-                           doc
-                           {:refresh "true"})))
+         (sut/create-doc conn
+                         indexname
+                         doc
+                         {:refresh "true"}))
        (is (apply = (repeatedly 30 search-query)))))))
 
 (deftest ^:integration count-test
@@ -473,10 +447,9 @@
     (for-each-es-version
      "count-docs must properly count document"
      #(es-index/delete! conn indexname)
-     (let [sample-docs (mapv #(cond-> {:_index indexname
-                                       :foo :bar
-                                       :_id %}
-                                (= 5 version) (assoc :_type "doc-type"))
+     (let [sample-docs (mapv #(assoc {:_index indexname
+                                      :foo :bar}
+                                     :_id %)
                              (range 10))]
        (es-index/delete! conn indexname)
        (es-index/create! conn indexname {})
@@ -497,11 +470,10 @@
     (for-each-es-version
      "query should tigger a proper search query"
      #(es-index/delete! conn indexname)
-     (let [sample-docs (mapv #(cond-> {:_index indexname
-                                       :foo :bar
-                                       :price %
-                                       :_id (str %)}
-                                (= 5 version) (assoc :_type "doc-type"))
+      (let [sample-docs (mapv #(assoc {:_index indexname
+                                       :foo :bar}
+                                      :price %
+                                      :_id (str %))
                              (range 10))
            sample-3-docs (->> (shuffle sample-docs)
                               (take 3))
@@ -626,26 +598,24 @@
     (for-each-es-version
      "delete-by-query should trigger a proper _delete_by_query request"
      #(es-index/delete! conn (str indexname "*"))
-     (let [sample-docs-1 (mapv #(cond-> {:_index indexname1
+      (let [sample-docs-1 (mapv #(assoc {:_index indexname1
                                          :foo (if (< % 5)
                                                 :bar1
-                                                :bar2)
-                                         :_id %}
-                                  (= 5 version) (assoc :_type "doc-type"))
+                                                :bar2)}
+                                        :_id %)
                                (range 10))
-           sample-docs-2 (mapv #(cond-> {:_index indexname2
+            sample-docs-2 (mapv #(assoc {:_index indexname2
                                          :foo (if (< % 5)
                                                 :bar1
-                                                :bar2)
-                                         :_id %}
-                                  (= 5 version) (assoc :_type "doc-type"))
+                                                :bar2)}
+                                        :_id %)
                                (range 10))
            q-term (query/term :foo :bar2)
            q-ids-1 (query/ids ["0" "1" "2"])
            q-ids-2 (query/ids ["3" "4"])
-           base-params (cond-> {:wait_for_completion true
-                                :refresh "true"}
-                         (= 7 version) (assoc :slices "auto"))]
+           base-params {:wait_for_completion true
+                        :refresh "true"
+                        :slices "auto"}]
        (es-index/delete! conn indexname)
        (es-index/create! conn indexname {})
        (sut/bulk-create-docs conn sample-docs-1 {:refresh "true"})
@@ -674,12 +644,10 @@
      "update by query."
      #(es-index/delete! conn indexname)
      (let [;; init state
-           doc-type (when (= 5 version) "sighting")
-           base-mappings (cond->> {:dynamic false ;; do not index fields without mapping
-                                   :properties {:name {:type "keyword"}
-                                                :age {:type "integer"}
-                                                :title {:type "text"}}}
-                           (= version 5) (assoc {} doc-type)) ;; ES5/7 mapping compatilbity
+           base-mappings {:dynamic false ;; do not index fields without mapping
+                          :properties {:name {:type "keyword"}
+                                       :age {:type "integer"}
+                                       :title {:type "text"}}}
            base-settings {:number_of_shards "1"
                           :number_of_replicas "1"}
            index-create-res (es-index/create!
@@ -693,7 +661,6 @@
            ;; insert some documents
            sample-docs (map #(hash-map :_index indexname
                                        :_id (str (UUID/randomUUID))
-                                       :_type doc-type
                                        :name (str "name " %)
                                        :age %
                                        ;; one more field that's not indexed yet
@@ -735,9 +702,7 @@
            (es-index/update-mappings!
             conn
             indexname
-            doc-type
-            (cond->> {:properties {:sport {:type "text"}}}
-              (= version 5) (assoc {} doc-type)))
+            {:properties {:sport {:type "text"}}})
 
            ;; since mapping was updated _after_ we inserted data, :sport field still
            ;; not indexed, and searching on that field still shouldn't get anything

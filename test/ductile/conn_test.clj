@@ -14,7 +14,7 @@
          (:uri (sut/connect {:host "127.0.0.1"
                              :port 9200})))))
 
-(deftest mak-http-opts-test
+(deftest make-http-opts-test
   (let [{:keys [cm] :as conn-wo-auth}
         (sut/connect {:host "127.0.0.1"
                       :port 9200})
