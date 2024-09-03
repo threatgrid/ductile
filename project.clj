@@ -3,10 +3,10 @@
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.11.3"]
+  :dependencies [[org.clojure/clojure "1.12.0"]
                  [org.clojure/tools.logging "1.2.4"]
                  [prismatic/schema "1.4.1"]
-                 [metosin/schema-tools "0.12.3"]
+                 [metosin/schema-tools "0.13.1"]
                  [clj-http "3.12.3"]
                  [cheshire "5.11.0"]]
   ;; make `lein deploy` use clojars by default
