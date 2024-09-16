@@ -46,7 +46,7 @@
                               "test_index"
                               ""
                               "test"))
-        "index-doc-uri should buir an ES7 comptatible uri when the type is an empty string")))
+        "index-doc-uri should build an ES7 comptatible uri when the type is an empty string")))
 
 (deftest update-doc-uri-test
   (is (= (sut/update-doc-uri "http://127.0.0.1"
