@@ -5,7 +5,7 @@
    [clojure.string :as string]
    [clojure.walk :as walk]
    [ductile.conn :refer [make-http-opts safe-es-read]]
-   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings Policy]]
+   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings Policy AliasAction]]
    [ductile.uri :as uri]
    [schema-tools.core :as st]
    [schema.core :as s]))
@@ -29,6 +29,11 @@
    template-name :- s/Str]
   "make an index template uri from a host and a template name"
   (uri/uri uri "_index_template" (uri/uri-encode template-name)))
+
+(s/defn alias-uri :- s/Str
+  "make an _alias uri from a host"
+  [uri :- s/Str]
+  (uri/uri uri "_aliases"))
 
 (s/defn rollover-uri :- s/Str
   "make a rollover uri from a host and an index name"
@@ -402,3 +407,13 @@
         request-fn
         safe-es-read
         format-cat)))
+
+(s/defn alias-actions!
+  "submit alias actions"
+  [{:keys [uri request-fn] :as conn} :- ESConn
+   actions :- [AliasAction]]
+  (-> (make-http-opts conn {} nil {:actions actions} nil)
+      (assoc :method :post
+             :url (alias-uri uri))
+      request-fn
+      safe-es-read))

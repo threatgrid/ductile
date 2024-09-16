@@ -4,10 +4,13 @@
 
 A minimalist clojure library for Elasticsearch REST API.
 
-It's currently compatible with Elasticsearch 7.x. Ductile proposes a limited support to prior Elasticsearch version (5 and 6) through a compatibility mode that is more intended to help migrating data.
+It's currently compatible with Elasticsearch 7.x. 
+Until 0.4.9, Ductile proposes a limited support to prior Elasticsearch version (5 and 6) through a compatibility mode that is more intended to help migrating data.
 
 ## Changes
 
+- 0.5.0
+  - Remove ES5 support, add aliases support
 - 0.4.5
   - Fix: Ensure UTF-8 encoding for bulk insert operations
 - 0.4.4:
@@ -117,14 +120,14 @@ The `version` field accepts an integer value to specify the major Elasticsearch 
 
 
 ;; you can also manage templates
-(es-index/create-template! c "test-index" test-config ["foo*" "bar*"])
+(es-index/create-index-template! c "test-index" test-config ["foo*" "bar*"])
 
 ;; when the index-patterns are not provided, one will be generated from the name with a wildcard suffix
 ;; for instance, the following template will have the index-patterns ["test-index*"]
-(es-index/create-template! c "test-index" test-config)
+(es-index/create-index-template! c "test-index" test-config)
 
-(es-index/get-template c "test-index")
-(es-index/delete-template! c "test-index")
+(es-index/get-index-template c "test-index")
+(es-index/delete-index-template! c "test-index")
 ```
 
 ### crud operations

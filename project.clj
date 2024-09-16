@@ -1,4 +1,4 @@
-(defproject threatgrid/ductile "0.4.9-SNAPSHOT"
+(defproject threatgrid/ductile "0.5.0-SNAPSHOT"
   :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
@@ -6,7 +6,7 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/tools.logging "1.2.4"]
                  [prismatic/schema "1.4.1"]
-                 [metosin/schema-tools "0.12.3"]
+                 [metosin/schema-tools "0.13.1"]
                  [clj-http "3.12.3"]
                  [cheshire "5.11.0"]]
   ;; make `lein deploy` use clojars by default

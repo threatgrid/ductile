@@ -21,7 +21,7 @@
 - wrap body with a `testing` block with with `msg` formatted with `version`
 - call `clean` fn if not `nil` before and after body."
   {:style/indent 2}
-  `(doseq [~'version [5 7]]
+  `(doseq [~'version [7]]
      (let [~'conn (connect ~'version basic-auth-opts)
            clean-fn# ~clean]
        (try

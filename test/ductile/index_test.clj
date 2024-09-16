@@ -67,25 +67,16 @@
                   :actions
                   {:rollover {:max_docs 100000000}}}}}]
     (for-each-es-version
-     "Policy operations should be available for ES >= 7"
-     (when (< 7 version) (sut/delete-policy! conn policy-name))
-     (if (< version 7)
-       (do
-         (is (thrown? ExceptionInfo
-                      (sut/create-policy! conn policy-name policy)))
-         (is (thrown? ExceptionInfo
-                      (sut/delete-policy! conn policy-name)))
-         (is (thrown? ExceptionInfo
-                      (sut/get-policy conn policy-name))))
-       (do
-         (is (= {:acknowledged true}
-                (sut/create-policy! conn policy-name policy)))
-         (is (= policy
-                (get-in (sut/get-policy conn policy-name)
-                        [(keyword policy-name) :policy])))
-         (is (= {:acknowledged true}
-                (sut/delete-policy! conn policy-name)))
-         (is (= nil (sut/get-policy conn policy-name))))))))
+     "Policy operations"
+     (sut/delete-policy! conn policy-name)
+      (is (= {:acknowledged true}
+             (sut/create-policy! conn policy-name policy)))
+      (is (= policy
+             (get-in (sut/get-policy conn policy-name)
+                     [(keyword policy-name) :policy])))
+      (is (= {:acknowledged true}
+             (sut/delete-policy! conn policy-name)))
+      (is (= nil (sut/get-policy conn policy-name))))))
 
 (deftest ^:integration index-crud-ops
   (let [indexname "test_index"
@@ -93,10 +84,8 @@
     (for-each-es-version
      "all ES Index CRUD operations"
      #(sut/delete! conn indexname)
-     (let [doc-type (when (= 5 version) :sighting)
-           base-mappings (cond->> {:properties {:name {:type "text"}
-                                                :age {:type "integer"}}}
-                           (= version 5) (assoc {} doc-type))
+      (let [base-mappings {:properties {:name {:type "text"}
+                                        :age {:type "integer"}}}
            base-settings {:number_of_shards "1"
                           :number_of_replicas "1"}
            index-create-res
@@ -105,11 +94,10 @@
                         {:mappings base-mappings
                          :settings base-settings})
            updated-mappings (assoc-in base-mappings
-                                      (remove nil? [doc-type :properties :email :type])
+                                      [:properties :email :type]
                                       "keyword")
            _ (sut/update-mappings! conn
                                    indexname
-                                   (some-> doc-type name)
                                    updated-mappings)
            updated-settings (assoc base-settings :number_of_replicas "2")
            _ (sut/update-settings! conn
@@ -133,12 +121,11 @@
                          [:number_of_shards
                           :number_of_replicas
                           :provided_name])))
-       (is (= (cond-> {:acknowledged true}
-                (< 5 version) (assoc :shards_acknowledged true))
+       (is (= {:acknowledged true :shards_acknowledged true}
               index-open-res))
-       (is (= (cond-> {:acknowledged true}
-                (< 5 version) (assoc :shards_acknowledged true
-                                     :indices {indexkw {:closed true}}))
+       (is (= {:acknowledged true
+               :shards_acknowledged true
+               :indices {indexkw {:closed true}}}
               index-close-res))
        (is (true? (boolean index-delete-res)))))))
 
@@ -174,9 +161,8 @@
 
      ;; add 3 documents to trigger max-doc condition
      (es-doc/bulk-index-docs conn
-                             (repeat 3 (cond-> {:_index aliasname
-                                                :foo :bar}
-                                         (= 5 version) (assoc :_type "doc_type")))
+                             (repeat 3 {:_index aliasname
+                                        :foo :bar})
                              {:refresh "true"})
 
      (testing "rollover dry_run parameter should be properly applied when condition is met"
@@ -225,13 +211,11 @@
    nil
    (let [template-name-1 "template-1"
          template-name-2 "template-2"
-         doc-type :malware
          alias1 :alias1
          alias2 :alias2
          config {:settings {:number_of_shards "1"
                             :refresh_interval "2s"}
-                 :mappings (cond->> {:_source {:enabled false}}
-                             (= version 5) (assoc {} doc-type))
+                 :mappings {:_source {:enabled false}}
                  :aliases {alias1 {}
                            alias2 {:filter {:term {:user "kimchy"}}
                                    :routing "kimchy"}}}
@@ -262,9 +246,7 @@
                                   config)))
      (let [template (-> (sut/get-template conn template-name-2)
                         (get (keyword template-name-2)))]
-       (if (= version 5)
-         (is (= "template-2*" (:template template)))
-         (is (= ["template-2*"] (:index_patterns template)))))
+       (is (= ["template-2*"] (:index_patterns template))))
      (is (= {:acknowledged true}
             (sut/delete-template! conn template-name-1)))
      (is (= {:acknowledged true}
@@ -286,37 +268,29 @@
                                     :aliases {alias1 {}
                                               alias2 {:filter {:term {:user "kimchy"}}
                                                       :routing "kimchy"}}}}]
-     (if (< version 7)
-       (do
-         (is (thrown? ExceptionInfo
-                      (sut/create-index-template! conn template-name index-template)))
-         (is (thrown? ExceptionInfo
-                      (sut/get-index-template conn template-name)))
-         (is (thrown? ExceptionInfo
-                      (sut/delete-index-template! conn template-name))))
-       (let [_ (is (= {:acknowledged true}
-                      (sut/create-index-template! conn
-                                                  template-name
-                                                  index-template)))]
-         (is (= {:index_templates
-                 [{:name "template-test",
-                   :index_template
-                   {:index_patterns ["pattern1" "pattern2"],
-                    :template
-                    {:settings
-                     {:index {:number_of_shards "1", :refresh_interval "2s"}},
-                     :mappings {:_source {:enabled false}},
-                     :aliases
-                     {:alias1 {},
-                      :alias2
-                      {:filter {:term {:user "kimchy"}},
-                       :index_routing "kimchy",
-                       :search_routing "kimchy"}}},
-                    :composed_of []}}]}
-                (sut/get-index-template conn template-name)))
-         (is (= {:acknowledged true}
-                (sut/delete-index-template! conn template-name)))
-         (is (nil? (sut/get-index-template conn template-name))))))))
+     (let [_ (is (= {:acknowledged true}
+                    (sut/create-index-template! conn
+                                                template-name
+                                                index-template)))]
+       (is (= {:index_templates
+               [{:name "template-test",
+                 :index_template
+                 {:index_patterns ["pattern1" "pattern2"],
+                  :template
+                  {:settings
+                   {:index {:number_of_shards "1", :refresh_interval "2s"}},
+                   :mappings {:_source {:enabled false}},
+                   :aliases
+                   {:alias1 {},
+                    :alias2
+                    {:filter {:term {:user "kimchy"}},
+                     :index_routing "kimchy",
+                     :search_routing "kimchy"}}},
+                  :composed_of []}}]}
+              (sut/get-index-template conn template-name)))
+       (is (= {:acknowledged true}
+              (sut/delete-index-template! conn template-name)))
+       (is (nil? (sut/get-index-template conn template-name)))))))
 
 (deftest ^:integration data-stream-test
   (let [data-stream-name "test-data-stream"
@@ -325,30 +299,21 @@
                         :template {:settings {:number_of_shards "1"
                                               :number_of_replicas "0"}}}]
     (for-each-es-version
-     "data-stream operations should be available for ES >= 7"
-     (when (< 7 version) (sut/delete-data-stream! conn data-stream-name))
-     (if (< version 7)
-       (do
-         (is (thrown? ExceptionInfo
-                      (sut/create-data-stream! conn data-stream-name)))
-         (is (thrown? ExceptionInfo
-                      (sut/delete-data-stream! conn data-stream-name)))
-         (is (thrown? ExceptionInfo
-                      (sut/get-data-stream conn data-stream-name))))
-       (do
-         (assert (= {:acknowledged true}
-                    (sut/create-index-template! conn
-                                                data-stream-name
-                                                index-template))
-                 "data-stream must match an index template in order to be created")
-         (is (= {:acknowledged true}
-                (sut/create-data-stream! conn data-stream-name)))
-         (is (= data-stream-name
-                (get-in (sut/get-data-stream conn data-stream-name)
-                        [:data_streams 0 :name])))
-         (is (= {:acknowledged true}
-                (sut/delete-data-stream! conn data-stream-name)))
-         (is (= nil (sut/get-data-stream conn data-stream-name))))))))
+     "data-stream operations"
+     (sut/delete-data-stream! conn data-stream-name)
+      (assert (= {:acknowledged true}
+                 (sut/create-index-template! conn
+                                             data-stream-name
+                                             index-template))
+              "data-stream must match an index template in order to be created")
+      (is (= {:acknowledged true}
+             (sut/create-data-stream! conn data-stream-name)))
+      (is (= data-stream-name
+             (get-in (sut/get-data-stream conn data-stream-name)
+                     [:data_streams 0 :name])))
+      (is (= {:acknowledged true}
+             (sut/delete-data-stream! conn data-stream-name)))
+      (is (= nil (sut/get-data-stream conn data-stream-name))))))
 
 (deftest ^:integration cat-indices-test
   (for-each-es-version
@@ -370,20 +335,59 @@
   (let [indices (cons "settings-test-fetch"
                       (map #(str "settings-test-fetch-" %) (range 10)))]
     (for-each-es-version
-     "fetch shall properly return settings"
-     #(sut/delete! conn "settings-test-*")
+      "fetch shall properly return settings"
+      #(sut/delete! conn "settings-test-*")
 
-     (doseq [index indices]
-       (sut/create! conn index {}))
+      (doseq [index indices]
+        (sut/create! conn index {}))
 
-     (testing "fetch settings of specific index"
-       (let [{:keys [settings-test-fetch]} (sut/get-settings conn "settings-test-fetch")]
-         (is (= 10000 (get-in settings-test-fetch [:index :max_result_window]))))
-       (sut/update-settings! conn "settings-test-fetch" {:max_result_window 20})
-       (let [{:keys [settings-test-fetch]} (sut/get-settings conn)]
-         (is (= 20 (get-in settings-test-fetch [:index :max_result_window])))))
+      (testing "fetch settings of specific index"
+        (let [{:keys [settings-test-fetch]} (sut/get-settings conn "settings-test-fetch")]
+          (is (= 10000 (get-in settings-test-fetch [:index :max_result_window]))))
+        (sut/update-settings! conn "settings-test-fetch" {:max_result_window 20})
+        (let [{:keys [settings-test-fetch]} (sut/get-settings conn)]
+          (is (= 20 (get-in settings-test-fetch [:index :max_result_window])))))
 
-     (testing "fetch settings of all indices"
-       (let [res (sut/get-settings conn)]
-         (is (= (set (map keyword indices))
-                (set (keys res)))))))))
+      (testing "fetch settings of all indices"
+        (let [res (sut/get-settings conn)]
+          (is (= (set (map keyword indices))
+                 (set (keys res)))))))))
+
+(deftest ^:integration alias-actions-test
+  (let [indexname "test_index"
+        indexkw (keyword indexname)]
+    (for-each-es-version
+      "all ES Index CRUD operations"
+      #(sut/delete! conn indexname)
+      (let [base-mappings {:properties {:name {:type "text"}
+                                        :age {:type "integer"}}}
+            base-settings {:number_of_shards "1"
+                           :number_of_replicas "1"}
+            index-create-res
+            (sut/create! conn
+                         indexname
+                         {:mappings base-mappings
+                          :settings base-settings})
+            test-cases [{:message "add aliases"
+                         :actions [{:add {:index indexname :alias "alias1"}}
+                                   {:add {:index indexname :alias "alias2"}}]}
+                        {:message "remove and add"
+                         :actions [{:remove {:index indexname :alias "alias1"}}
+                                   {:add {:index indexname :alias "alias3"}}]}
+                        {:message "add is_write_index to an existing index and add a new one"
+                         :actions [{:add {:index indexname :alias "alias3" :is_write_index true}}
+                                   {:add {:index indexname :alias "alias4" :is_write_index true}}]}]
+            check-action (fn [action]
+                           (let [[action-type action-params] (first action)
+                                 index (sut/get conn indexname)
+                                 index-alias (first (filter #(= (name (first %)) (:alias action-params))
+                                                            (get-in index [indexkw :aliases])))]
+                             (case action-type
+                               :add (is (seq index-alias))
+                               :remove (is (nil? index-alias)))))]
+        (doseq [{:keys [message es-versions actions]} test-cases]
+          (testing message
+            (is (= {:acknowledged true}
+                   (sut/alias-actions! conn actions)))
+            (doseq [action actions]
+              (check-action action))))))))

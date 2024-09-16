@@ -133,3 +133,10 @@
 (s/defschema Policy
   (st/open-schema
    {:phases PolicyPhases}))
+
+(s/defschema AliasAction
+  {(s/enum :add :remove :remove_index)
+   (st/optional-keys
+    {:index s/Str
+     :alias s/Str
+     :is_write_index s/Bool})})
