@@ -9,9 +9,9 @@ on:
       - master
 
 env:
-  LOG_DIR: $HOME/log
-  BIN_DIR: $HOME/bin
-  COMPOSE_LOG: $HOME/log/docker-compose.log
+  LOG_DIR: ${{github.workspace}}/log
+  BIN_DIR: ${{github.workspace}}/bin
+  COMPOSE_LOG: ${{github.workspace}}/log/docker-compose.log
 
 jobs:
   test:
