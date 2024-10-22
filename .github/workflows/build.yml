@@ -36,7 +36,7 @@ jobs:
       # create log & bin dir if missing
       - run: mkdir -p $LOG_DIR
       - run: mkdir -p $BIN_DIR
-      - run: docker-compose -f containers/docker-compose.yml up -d > $COMPOSE_LOG
+      - run: docker compose -f containers/docker-compose.yml up -d > $COMPOSE_LOG
       # Wait ES
       - run: until curl http://127.0.0.1:9207/; do sleep 1; done
       - name: Install clojure tools
