@@ -17,6 +17,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    matrix:
+      docker-compose:
+        - 'containers/docker-compose.yml'
+        - 'containers/es7/docker-compose.yml'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,9 +41,9 @@ jobs:
       # create log & bin dir if missing
       - run: mkdir -p $LOG_DIR
       - run: mkdir -p $BIN_DIR
-      - run: docker compose -f containers/docker-compose.yml up -d --wait
-      - run: docker compose -f containers/docker-compose.yml logs -f > $COMPOSE_LOG &
-      - run: docker compose -f containers/docker-compose.yml ps
+      - run: docker compose -f ${{ matrix.docker-compose }} up -d --wait
+      - run: docker compose -f ${{ matrix.docker-compose }} logs -f > $COMPOSE_LOG &
+      - run: docker compose -f ${{ matrix.docker-compose }} ps
 
       # Wait ES
       - run: until curl http://127.0.0.1:9207/; do sleep 1; done
