@@ -17,10 +17,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    matrix:
-      docker-compose:
-        - 'containers/docker-compose.yml'
-        - 'containers/es7/docker-compose.yml'
+    strategy:
+      matrix:
+        docker-compose:
+          - 'containers/docker-compose.yml'
+          - 'containers/es7/docker-compose.yml'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
