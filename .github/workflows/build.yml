@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+env:
+  LOG_DIR: ${{github.workspace}}/log
+  BIN_DIR: ${{github.workspace}}/bin
+  COMPOSE_LOG: ${{github.workspace}}/log/docker-compose.log
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        docker-compose:
+          - 'containers/docker-compose.yml'
+          - 'containers/es7/docker-compose.yml'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cache project dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-clojure-${{ hashFiles('**/project.clj') }}
+          restore-keys: |
+            ${{ runner.os }}-clojure
+      - name: Prepare java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+      # ES5 needs this
+      - run: sudo sysctl -w vm.max_map_count=262144
+      # create log & bin dir if missing
+      - run: mkdir -p $LOG_DIR
+      - run: mkdir -p $BIN_DIR
+      - run: docker compose -f ${{ matrix.docker-compose }} up -d --wait
+      - run: docker compose -f ${{ matrix.docker-compose }} logs -f > $COMPOSE_LOG &
+      - run: docker compose -f ${{ matrix.docker-compose }} ps
+
+      # Wait ES
+      - run: until curl http://127.0.0.1:9207/; do sleep 1; done
+      - name: Install clojure tools
+        uses: DeLaGuardo/setup-clojure@12.5
+        with:
+          lein: latest
+      - run: lein do clean, javac, test :all, with-profile test-encoding test
