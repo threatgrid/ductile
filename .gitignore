@@ -11,4 +11,4 @@ pom.xml.asc
 .hg/
 *.log
 .lsp/.cache/
-.clj-kondo/.cache/
+.clj-kondo/.cache/OPENSEARCH_MIGRATION.md

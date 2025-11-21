@@ -40,20 +40,22 @@
 
 (s/defn connect :- ESConn
   "Instantiate an ES conn from ConnectParams props.
-  
+
   To intercept all ES HTTP requests, set :request-fn
   to function with the same interface as the 1-argument
   arity of `clj-http.client/request`."
-  [{:keys [protocol host port timeout version auth request-fn]
+  [{:keys [protocol host port timeout version engine auth request-fn]
     :or {protocol :http
          request-fn client/request
          timeout default-timeout
-         version 7}} :- ConnectParams]
+         version 7
+         engine :elasticsearch}} :- ConnectParams]
   (let [conn {:cm (make-connection-manager
                    (cm-options {:timeout timeout}))
               :request-fn request-fn
               :uri (format "%s://%s:%s" (name protocol) host port)
-              :version version}]
+              :version version
+              :engine engine}]
     (cond-> conn
       auth (assoc :auth (auth/http-options auth)))))
 

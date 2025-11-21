@@ -23,15 +23,15 @@
 
 (deftest x-by-query-uri-test
   (testing "should generate a valid delete_by_query uri"
-    (is (= "http://localhost:9200/ctim/_delete_by_query"
-           (sut/delete-by-query-uri "http://localhost:9200" ["ctim"])))
-    (is (= "http://localhost:9200/ctim%2Cctia/_delete_by_query"
-           (sut/delete-by-query-uri "http://localhost:9200" ["ctim", "ctia"]))))
+    (is (= "http://localhost:9200/index1/_delete_by_query"
+           (sut/delete-by-query-uri "http://localhost:9200" ["index1"])))
+    (is (= "http://localhost:9200/index1%2Cindex2/_delete_by_query"
+           (sut/delete-by-query-uri "http://localhost:9200" ["index1", "index2"]))))
   (testing "should generate a valid update_by_query uri"
-    (is (= "http://localhost:9200/ctim/_update_by_query"
-           (sut/update-by-query-uri "http://localhost:9200" ["ctim"])))
-    (is (= "http://localhost:9200/ctim%2Cctia/_update_by_query"
-           (sut/update-by-query-uri "http://localhost:9200" ["ctim", "ctia"])))))
+    (is (= "http://localhost:9200/index1/_update_by_query"
+           (sut/update-by-query-uri "http://localhost:9200" ["index1"])))
+    (is (= "http://localhost:9200/index1%2Cindex2/_update_by_query"
+           (sut/update-by-query-uri "http://localhost:9200" ["index1", "index2"])))))
 
 (deftest index-doc-uri-test
   (testing "should generate a valid doc URI"
