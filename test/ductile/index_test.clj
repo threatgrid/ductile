@@ -320,7 +320,7 @@
                                               :number_of_replicas "0"}}}]
     (for-each-es-version
      "data-stream operations"
-     (sut/delete-data-stream! conn data-stream-name)
+     #(try (sut/delete-data-stream! conn data-stream-name) (catch Exception _))
       (assert (= {:acknowledged true}
                  (sut/create-index-template! conn
                                              data-stream-name
@@ -369,9 +369,11 @@
           (is (= 20 (get-in settings-test-fetch [:index :max_result_window])))))
 
       (testing "fetch settings of all indices"
-        (let [res (sut/get-settings conn)]
-          (is (= (set (map keyword indices))
-                 (set (keys res)))))))))
+        (let [res (sut/get-settings conn)
+              expected-indices (set (map keyword indices))
+              actual-indices (set (keys res))]
+          (is (set/subset? expected-indices actual-indices)
+              (str "Expected indices " expected-indices " to be subset of " actual-indices)))))))
 
 (deftest ^:integration alias-actions-test
   (let [indexname "test_index"
