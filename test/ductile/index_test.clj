@@ -4,6 +4,7 @@
             [clojure.string :as string]
             [ductile.document :as es-doc]
             [ductile.index :as sut]
+            [ductile.lifecycle :as lifecycle]
             [ductile.test-helpers :refer [for-each-es-version]]
             [schema.test :refer [validate-schemas]])
   (:import java.util.UUID clojure.lang.ExceptionInfo))
@@ -51,7 +52,7 @@
 
 (deftest policy-uri-test
   (testing "should generate a proper policy URI"
-    (is (= (sut/policy-uri "http://127.0.0.1" "test-policy")
+    (is (= (lifecycle/policy-uri "http://127.0.0.1" "test-policy")
            "http://127.0.0.1/_ilm/policy/test-policy"))))
 
 (deftest data-stream-uri-test
@@ -69,13 +70,13 @@
     (for-each-es-version
      "Policy operations"
      ;; Clean up any existing policy
-     (try (sut/delete-policy! conn policy-name) (catch Exception _))
+     (try (lifecycle/delete-policy! conn policy-name) (catch Exception _))
       ;; Create policy
       (is (= {:acknowledged true}
-             (sut/create-policy! conn policy-name policy)))
+             (lifecycle/create-policy! conn policy-name policy)))
 
       ;; Get policy and verify
-      (let [retrieved (sut/get-policy conn policy-name)]
+      (let [retrieved (lifecycle/get-policy conn policy-name)]
         (case engine
           :elasticsearch
           ;; For Elasticsearch, expect ILM format
@@ -91,10 +92,10 @@
 
       ;; Delete policy
       (is (= {:acknowledged true}
-             (sut/delete-policy! conn policy-name)))
+             (lifecycle/delete-policy! conn policy-name)))
 
       ;; Verify deletion
-      (is (= nil (sut/get-policy conn policy-name))))))
+      (is (= nil (lifecycle/get-policy conn policy-name))))))
 
 (deftest ^:integration index-crud-ops
   (let [indexname "test_index"

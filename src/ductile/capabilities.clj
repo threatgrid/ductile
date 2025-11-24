@@ -14,9 +14,7 @@
 (s/defschema EngineInfo
   "Detected engine information"
   {:engine (s/enum :elasticsearch :opensearch)
-   :version VersionInfo
-   (s/optional-key :distribution) s/Str
-   (s/optional-key :build-flavor) s/Str})
+   :version VersionInfo})
 
 (defn parse-version
   "Parse version string like '2.19.0' or '7.17.0' into components
@@ -60,21 +58,17 @@
   (let [version-info (:version cluster-info)
         version-number (:number version-info)
         distribution (or (:distribution version-info) "elasticsearch")
-        build-flavor (:build_flavor version-info)
         parsed-version (parse-version version-number)]
     (cond
       ;; OpenSearch has a "distribution" field
       (= distribution "opensearch")
-      (cond-> {:engine :opensearch
-               :version parsed-version
-               :distribution distribution}
-        build-flavor (assoc :build-flavor build-flavor))
+      {:engine :opensearch
+       :version parsed-version}
 
       ;; Elasticsearch (no distribution field, or explicit "elasticsearch")
       :else
-      (cond-> {:engine :elasticsearch
-               :version parsed-version}
-        build-flavor (assoc :build-flavor build-flavor)))))
+      {:engine :elasticsearch
+       :version parsed-version})))
 
 (s/defn verify-connection :- EngineInfo
   "Verify connection and detect engine type and version.
@@ -83,8 +77,7 @@
      (def conn (es-conn/connect {:host \"localhost\" :port 9200}))
      (verify-connection conn)
      ;; => {:engine :opensearch
-     ;;     :version {:major 2 :minor 19 :patch 0}
-     ;;     :distribution \"opensearch\"}
+     ;;     :version {:major 2 :minor 19 :patch 0}}
 
    This is useful for:
    1. Auto-detecting the engine type if not specified

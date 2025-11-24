@@ -133,8 +133,7 @@ Ductile can automatically detect the engine type and version:
 ;; Auto-detect engine and version
 (cap/verify-connection conn)
 ;; => {:engine :opensearch
-;;     :version {:major 2 :minor 19 :patch 0}
-;;     :distribution "opensearch"}
+;;     :version {:major 2 :minor 19 :patch 0}}
 ```
 
 ### Feature Detection
@@ -226,13 +225,14 @@ Index operations work identically on both Elasticsearch and OpenSearch:
              :actions {:delete {}}}}})
 
 ;; Create policy - automatically transforms to ISM for OpenSearch
-(es-index/create-policy! conn "my-rollover-policy" rollover-policy)
+(require '[ductile.lifecycle :as lifecycle])
+(lifecycle/create-policy! conn "my-rollover-policy" rollover-policy)
 
 ;; Get policy (returns ILM format for ES, ISM format for OpenSearch)
-(es-index/get-policy conn "my-rollover-policy")
+(lifecycle/get-policy conn "my-rollover-policy")
 
 ;; Delete policy
-(es-index/delete-policy! conn "my-rollover-policy")
+(lifecycle/delete-policy! conn "my-rollover-policy")
 ```
 
 **How it works:**
@@ -380,8 +380,10 @@ If you use ILM policies, no code changes are required! Policies are automaticall
 
 ```clojure
 ;; This code works for BOTH Elasticsearch and OpenSearch
+(require '[ductile.lifecycle :as lifecycle])
+
 (defn setup-lifecycle [conn]
-  (es-index/create-policy! conn "my-policy"
+  (lifecycle/create-policy! conn "my-policy"
     {:phases {:hot {:actions {:rollover {:max_docs 1000000}}}
               :delete {:min_age "30d" :actions {:delete {}}}}}))
 

@@ -6,8 +6,7 @@
    [clojure.walk :as walk]
    [ductile.conn :refer [make-http-opts safe-es-read]]
    [ductile.features :as feat]
-   [ductile.lifecycle :as lifecycle]
-   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings Policy AliasAction]]
+   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings AliasAction]]
    [ductile.uri :as uri]
    [schema-tools.core :as st]
    [schema.core :as s]))
@@ -53,23 +52,6 @@
    index-name :- (s/maybe s/Str)]
   (uri/uri uri (uri/uri-encode index-name) "_refresh"))
 
-(s/defn policy-uri
-  "Make a policy URI from a host, policy name, and engine type.
-   - Elasticsearch uses _ilm/policy
-   - OpenSearch uses _plugins/_ism/policies"
-  ([uri :- s/Str
-    policy-name :- s/Str
-    engine :- s/Keyword]
-   (case engine
-     :elasticsearch (uri/uri uri "_ilm/policy" (uri/uri-encode policy-name))
-     :opensearch (uri/uri uri "_plugins/_ism/policies" (uri/uri-encode policy-name))
-     ;; Default to ILM for backward compatibility
-     (uri/uri uri "_ilm/policy" (uri/uri-encode policy-name))))
-  ([uri :- s/Str
-    policy-name :- s/Str]
-   ;; Backward compatibility: default to Elasticsearch ILM
-   (policy-uri uri policy-name :elasticsearch)))
-
 (s/defn data-stream-uri
   "make a datastral uri from a host, and a data stream name"
   [uri :- s/Str
@@ -108,87 +90,6 @@
              :url (data-stream-uri uri data-stream-name))
       request-fn
       safe-es-read))
-
-(s/defn create-policy!
-  "Create a lifecycle management policy.
-   - For Elasticsearch: Creates an ILM policy
-   - For OpenSearch: Creates an ISM policy (automatically transforms ILM if needed)
-
-   The policy parameter should be in ILM format. It will be automatically
-   transformed to ISM format if connecting to OpenSearch."
-  [{:keys [uri version engine request-fn] :as conn} :- ESConn
-   policy-name :- s/Str
-   policy :- Policy]
-  ;; Check feature support
-  (when-not (feat/lifecycle-management-type conn)
-    (throw (ex-info "Lifecycle management not supported"
-                    {:engine engine :version version})))
-
-  ;; Transform policy to target engine format
-  (let [normalized-policy (lifecycle/normalize-policy policy engine)
-        ;; OpenSearch requires the policy in a "policy" wrapper
-        request-body (case engine
-                       :elasticsearch {:policy policy}
-                       :opensearch {:policy normalized-policy}
-                       {:policy policy})
-        response (-> (make-http-opts conn
-                                     {}
-                                     []
-                                     request-body
-                                     nil)
-                     (assoc :method :put
-                            :url (policy-uri uri policy-name engine))
-                     request-fn
-                     safe-es-read)]
-    ;; Normalize OpenSearch response to match Elasticsearch format
-    (case engine
-      :opensearch (if (:_id response)
-                    {:acknowledged true}
-                    response)
-      response)))
-
-(s/defn delete-policy!
-  "Delete a lifecycle management policy.
-   Works with both Elasticsearch ILM and OpenSearch ISM."
-  [{:keys [uri version engine request-fn] :as conn} :- ESConn
-   policy-name :- s/Str]
-  (when-not (feat/lifecycle-management-type conn)
-    (throw (ex-info "Lifecycle management not supported"
-                    {:engine engine :version version})))
-  (let [response (-> (make-http-opts conn)
-                     (assoc :method :delete
-                            :url (policy-uri uri policy-name engine))
-                     request-fn
-                     safe-es-read)]
-    ;; Normalize OpenSearch response to match Elasticsearch format
-    (case engine
-      :opensearch (if (= (:result response) "deleted")
-                    {:acknowledged true}
-                    response)
-      response)))
-
-(s/defn get-policy
-  "Get a lifecycle management policy.
-   Works with both Elasticsearch ILM and OpenSearch ISM.
-   Returns the policy in its native format (ILM or ISM)."
-  [{:keys [uri version engine request-fn] :as conn} :- ESConn
-   policy-name :- s/Str]
-  (when-not (feat/lifecycle-management-type conn)
-    (throw (ex-info "Lifecycle management not supported"
-                    {:engine engine :version version})))
-  (let [response (-> (make-http-opts conn)
-                     (assoc :method :get
-                            :url (policy-uri uri policy-name engine))
-                     request-fn
-                     safe-es-read)]
-    ;; Normalize OpenSearch response to match Elasticsearch format
-    ;; ES: {:policy-name {:policy {:phases {...}}}}
-    ;; OS GET: {:_id "policy-name" :policy {:policy_id ... :states [...] ...}}
-    ;; We need to wrap the policy in the same structure as Elasticsearch
-    (case engine
-      :opensearch (when (:_id response)
-                    {(keyword policy-name) {:policy (:policy response)}})
-      response)))
 
 (s/defn index-exists? :- s/Bool
   "check if the supplied ES index exists"

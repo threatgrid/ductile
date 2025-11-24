@@ -32,8 +32,7 @@
                            :tagline "You Know, for Search"}
           result (sut/detect-engine es-cluster-info)]
       (is (= :elasticsearch (:engine result)))
-      (is (= {:major 7 :minor 17 :patch 0} (:version result)))
-      (is (= "default" (:build-flavor result)))))
+      (is (= {:major 7 :minor 17 :patch 0} (:version result)))))
 
   (testing "detect-engine identifies OpenSearch from cluster info"
     (let [os-cluster-info {:name "node-1"
@@ -44,8 +43,7 @@
                            :tagline "The OpenSearch Project: https://opensearch.org/"}
           result (sut/detect-engine os-cluster-info)]
       (is (= :opensearch (:engine result)))
-      (is (= {:major 2 :minor 19 :patch 0} (:version result)))
-      (is (= "opensearch" (:distribution result)))))
+      (is (= {:major 2 :minor 19 :patch 0} (:version result)))))
 
   (testing "detect-engine handles OpenSearch 3.x"
     (let [os3-cluster-info {:name "node-1"
@@ -159,5 +157,4 @@
                  :request-fn mock-request-fn})
           result (sut/verify-connection conn)]
       (is (= :opensearch (:engine result)))
-      (is (= {:major 2 :minor 19 :patch 0} (:version result)))
-      (is (= "opensearch" (:distribution result))))))
+      (is (= {:major 2 :minor 19 :patch 0} (:version result))))))

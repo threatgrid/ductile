@@ -75,7 +75,10 @@
      (supports-legacy-templates? {:engine :elasticsearch :version 7})
      ;; => true"
   [_conn :- ESConn]
-  ;; All versions support legacy templates
+  ;; All versions currently support legacy templates, even though they're deprecated.
+  ;; This function is a placeholder for future versions where legacy templates
+  ;; may be completely removed. When that happens, update this to return false
+  ;; for those versions, allowing applications to gracefully handle the change.
   true)
 
 (s/defn supports-doc-types? :- s/Bool
