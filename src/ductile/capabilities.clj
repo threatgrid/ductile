@@ -18,14 +18,17 @@
 
 (defn parse-version
   "Parse version string like '2.19.0' or '7.17.0' into components
-   Returns {:major X :minor Y :patch Z}"
+   Returns {:major X :minor Y :patch Z}, or nil if parsing fails"
   [version-str]
   (when version-str
-    (let [parts (str/split version-str #"\.")
-          [major minor patch] (map #(Integer/parseInt %) parts)]
-      (cond-> {:major major
-               :minor minor}
-        patch (assoc :patch patch)))))
+    (try
+      (let [parts (str/split version-str #"\.")
+            [major minor patch] (map #(Integer/parseInt %) parts)]
+        (cond-> {:major major
+                 :minor minor}
+          patch (assoc :patch patch)))
+      (catch NumberFormatException _
+        nil))))
 
 (s/defn get-cluster-info
   "Fetch cluster info from root endpoint"

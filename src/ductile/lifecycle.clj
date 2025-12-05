@@ -5,6 +5,7 @@
    and OpenSearch's ISM (Index State Management) policy formats, allowing the same policy
    API to work transparently with both engines."
   (:require [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [ductile.conn :refer [make-http-opts safe-es-read]]
             [ductile.features :as feat]
             [ductile.schemas :refer [ESConn Policy]]
@@ -109,7 +110,7 @@
     ;; Unsupported actions are logged but not transformed
     (do
       (when-not (#{:set_priority :allocate :migrate} action-name)
-        (println (str "Warning: Unsupported ILM action: " action-name)))
+        (log/warn "Unsupported ILM action:" action-name))
       nil)))
 
 (defn- transform-ilm-actions

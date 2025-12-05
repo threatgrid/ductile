@@ -147,6 +147,7 @@
                         :ism supports-ism?
                         :data-streams supports-data-streams?
                         :composable-templates supports-composable-templates?
+                        :legacy-templates supports-legacy-templates?
                         :doc-types supports-doc-types?}
         check-fn (get feature-checks feature)]
     (when-not (and check-fn (check-fn conn))
