@@ -32,6 +32,7 @@
     (s/optional-key :protocol) (s/enum :http :https)
     (s/optional-key :authorization) s/Str
     (s/optional-key :version) s/Int
+    (s/optional-key :engine) (s/enum :elasticsearch :opensearch)
     (s/optional-key :timeout) s/Int
     (s/optional-key :auth) AuthParams
     (s/optional-key :request-fn) RequestFn}))
@@ -43,6 +44,7 @@
                  PoolingHttpClientConnectionManager)
    :uri s/Str
    :version s/Int
+   :engine (s/enum :elasticsearch :opensearch)
    :request-fn RequestFn
    (s/optional-key :auth) (s/pred map?)})
 

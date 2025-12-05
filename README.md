@@ -2,414 +2,517 @@
 
 [![Clojars Project](https://img.shields.io/clojars/v/threatgrid/ductile.svg)](https://clojars.org/threatgrid/ductile)
 
-A minimalist clojure library for Elasticsearch REST API.
+A minimalist Clojure library for Elasticsearch and OpenSearch REST APIs.
 
-It's currently compatible with Elasticsearch 7.x. 
-Until 0.4.9, Ductile proposes a limited support to prior Elasticsearch version (5 and 6) through a compatibility mode that is more intended to help migrating data.
+## Features
+
+- **Multi-Engine Support**: Works transparently with both Elasticsearch 7.x and OpenSearch 2.x/3.x
+- **Pure REST API**: No heavyweight Java client dependencies
+- **Automatic Transformation**: ILM policies automatically transform to ISM for OpenSearch
+- **Feature Detection**: Automatically detects and adapts to engine capabilities
+- **Backward Compatible**: Existing Elasticsearch code works without changes
+
+## Compatibility
+
+| Engine | Versions | Status |
+|--------|----------|--------|
+| Elasticsearch | 7.x | ✅ Full Support |
+| OpenSearch | 2.x, 3.x | ✅ Full Support |
+| Elasticsearch | 5.x, 6.x | ⚠️ Deprecated (until 0.4.9) |
 
 ## Changes
 
+- **0.6.0** (Current)
+  - **NEW**: Full OpenSearch 2.x and 3.x support
+  - **NEW**: Automatic ILM to ISM policy transformation
+  - **NEW**: Engine detection and feature compatibility layer
+  - **NEW**: Multi-engine test infrastructure
 - 0.5.0
   - Remove ES5 support, add aliases support
 - 0.4.5
   - Fix: Ensure UTF-8 encoding for bulk insert operations
-- 0.4.4:
+- 0.4.4
   - Fix: preserve field order when sorting by multiple fields
-- 0.4.3: bad version (failed deployment)
+
+## Installation
+
+```clojure
+[threatgrid/ductile "0.6.0"]
+```
 
 ## Usage
 
+### Create a Connection
 
-### Create a connection to an elasticsearch instance
+#### Elasticsearch
 
 ```clojure
 (require '[ductile.conn :as es-conn])
 
-(def c (es-conn/connect {:host "localhost"
-                         :port 9200
-                         :version 7
-                         :protocol :http
-                         :timeout 20000
-                         :auth {:type :api-key
-                                :params {:id "ngkvLnYB4ZehGW1qU-Xz"
-                                         :api-key "6HMnACPRSVWSMvZCf9VcGg"}}}))
+;; Connect to Elasticsearch (default engine)
+(def es-conn (es-conn/connect {:host "localhost"
+                               :port 9200
+                               :version 7
+                               :protocol :http
+                               :auth {:type :basic-auth
+                                      :params {:user "elastic" :pwd "password"}}}))
 ```
 
-Only `host` and `port` are required. The default values for the optional fields are:
-- `version`: `7`.
-- `protocol`: `:http`.
-- `timeout`: `30000.` 
-- `auth`: none.
+#### OpenSearch
 
-#### Authentication
-
-Here is the schema of the `auth` values:
 ```clojure
-(s/defschema AuthParams
-  {:type (s/enum :basic-auth :api-key :oauth-token :bearer :headers)
-   :params {s/Keyword s/Str}})
+;; Connect to OpenSearch - just specify :engine
+(def os-conn (es-conn/connect {:host "localhost"
+                               :port 9200
+                               :engine :opensearch    ; ← Specify OpenSearch
+                               :version 2
+                               :protocol :http
+                               :auth {:type :basic-auth
+                                      :params {:user "admin" :pwd "password"}}}))
 ```
 
-The `type` field specifies the auth method and the `params` contains the authentication parameters.
-Here are some examples for each `type` value:
+**Connection Parameters:**
 
-* Authorization headers
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `:host` | ✅ | - | Hostname or IP address |
+| `:port` | ✅ | - | Port number |
+| `:engine` | ❌ | `:elasticsearch` | Engine type (`:elasticsearch` or `:opensearch`) |
+| `:version` | ❌ | `7` | Major version number |
+| `:protocol` | ❌ | `:http` | Protocol (`:http` or `:https`) |
+| `:timeout` | ❌ | `30000` | Request timeout in milliseconds |
+| `:auth` | ❌ | none | Authentication configuration |
 
-``` clojure
-{:type :headers
- :params {:authorization "ApiKey bmdrdkxuWUI0WmVoR1cxcVUtWHo6NkhNbkFDUFJTVldTTXZaQ2Y5VmNHZw=="}}
-```
+### Authentication
 
-* API Key
+Ductile supports multiple authentication methods:
 
-``` clojure
-{:type :api-key
- :params {:id "ngkvLnYB4ZehGW1qU-Xz"
-          :api-key "6HMnACPRSVWSMvZCf9VcGg"}}
-```
+#### Basic Auth
 
-* Basic Auth
-
-``` clojure
+```clojure
 {:type :basic-auth
-:params {:user "the-login" :pwd "the-pwd"}}
+ :params {:user "username" :pwd "password"}}
 ```
 
-* OAuth token
+#### API Key
 
-``` clojure
+```clojure
+{:type :api-key
+ :params {:id "key-id"
+          :api-key "key-secret"}}
+```
+
+#### OAuth Token
+
+```clojure
 {:type :oauth-token
-:params {:token "any-token"}}
+ :params {:token "your-token"}}
 ```
 
-* Bearer OAuth token
+#### Bearer Token
 
-Like Oauth token but prefixes the token with `Bearer ` if missing.
-
-``` clojure  
+```clojure
 {:type :bearer
- :params {:token "any-token"}}
-
+ :params {:token "your-token"}}
 ```
 
-Only `host` and `port` are required, the default version value is 7, the default protocol value is `:http`, and the default timeout is 30000 ms. 
-The `version` field accepts an integer value to specify the major Elasticsearch version, and is used for the compatibility mode with Elasticsearch 5.x and 6.x.
+#### Custom Headers
 
-### index operations
+```clojure
+{:type :headers
+ :params {:authorization "ApiKey base64-encoded-key"}}
+```
+
+### Engine Detection
+
+Ductile can automatically detect the engine type and version:
+
+```clojure
+(require '[ductile.capabilities :as cap])
+
+;; Auto-detect engine and version
+(cap/verify-connection conn)
+;; => {:engine :opensearch
+;;     :version {:major 2 :minor 19 :patch 0}}
+```
+
+### Feature Detection
+
+Check what features are available for your engine:
+
+```clojure
+(require '[ductile.features :as feat])
+
+;; Check specific features
+(feat/supports-ilm? conn)              ; => true for ES 7+, false for OpenSearch
+(feat/supports-ism? conn)              ; => true for OpenSearch, false for ES
+(feat/supports-data-streams? conn)     ; => true for ES 7+ and OpenSearch 2+
+(feat/lifecycle-management-type conn)  ; => :ilm or :ism
+
+;; Get complete feature summary
+(feat/get-feature-summary conn)
+;; => {:ilm false
+;;     :ism true
+;;     :data-streams true
+;;     :composable-templates true
+;;     :legacy-templates true
+;;     :doc-types false}
+```
+
+### Index Operations
+
+Index operations work identically on both Elasticsearch and OpenSearch:
 
 ```clojure
 (require '[ductile.index :as es-index])
 
-(sut/index-exists? conn "new_index")
-;;false
+;; Check if index exists
+(es-index/index-exists? conn "my-index")
+;; => false
 
-(def test-config {:settings {:number_of_shards 3
-                             :number_of_replicas 1
-                             :refresh_interval "1s"}
-                  :mappings {:properties {:name {:type :text}
-                                          :age {:type :long}
-                                          :description {:type :text}}}
-                  :aliases {:test-alias {}}})
-;; for Elasticsearch 5.x compatibility, you must specify the document type(s) in the mappings.
+;; Create index with configuration
+(def index-config
+  {:settings {:number_of_shards 3
+              :number_of_replicas 1
+              :refresh_interval "1s"}
+   :mappings {:properties {:name {:type :text}
+                           :age {:type :long}
+                           :created_at {:type :date}}}
+   :aliases {:my-index-alias {}}})
 
-(es-index/create! c "test-index" test-config)
+(es-index/create! conn "my-index" index-config)
 
-;; you can then delete or close that index
-(es-index/close! c "test-index")
-(es-index/delete! c "test-index")
+;; Manage index lifecycle
+(es-index/close! conn "my-index")
+(es-index/open! conn "my-index")
+(es-index/delete! conn "my-index")
 
-
-;; you can also manage templates
-(es-index/create-index-template! c "test-index" test-config ["foo*" "bar*"])
-
-;; when the index-patterns are not provided, one will be generated from the name with a wildcard suffix
-;; for instance, the following template will have the index-patterns ["test-index*"]
-(es-index/create-index-template! c "test-index" test-config)
-
-(es-index/get-index-template c "test-index")
-(es-index/delete-index-template! c "test-index")
+;; Refresh index
+(es-index/refresh! conn "my-index")
 ```
 
-### crud operations
-
-* create a document, and use the id field as document id
-```clojure
-(require '[ductile.document :as es-doc]) 
-(es-doc/create-doc c
-                   "test-index"
-                   {:id 1
-                   :name "John Doe"
-                   :description "an anonymous coward"}
-                   {:refresh "wait_for"})
-```
-  
-```clojure
-{:id 1, :name "John Doe", :description "an anonymous coward"}
-```
-
-if you try to create another document with the same id, it will throw an ExceptionInfo
+### Index Templates
 
 ```clojure
-(es-doc/create-doc c
-                      "test-index"
-                   {:id 1
-                    :name "Jane Doe"
-                    :description "another anonymous coward"}
-                   {:refresh "wait_for"})
-;; Execution error (ExceptionInfo) at ductile.conn/safe-es-read (conn.clj:54).
-;; ES query failed
-```
-it will return the document creation result
+;; Create composable index template (ES 7.8+, OpenSearch 1+)
+(es-index/create-index-template! conn "my-template" index-config ["logs-*" "metrics-*"])
 
-```clojure
- {:_index "test-index",
-  :_type "_doc",
-  :_id "1",
-  :_version 1,
-  :result "created",
-  :_shards {:total 2, :successful 1, :failed 0},
-  :_seq_no 0,
-  :_primary_term 1}
+;; Get template
+(es-index/get-index-template conn "my-template")
+
+;; Delete template
+(es-index/delete-index-template! conn "my-template")
+
+;; Legacy templates also supported
+(es-index/create-template! conn "legacy-template" index-config ["old-*"])
 ```
 
-if you do not provide the id field, elasticsearch will insert the document and generate an id
+### Lifecycle Management (ILM/ISM)
+
+**The same API works for both Elasticsearch ILM and OpenSearch ISM!**
 
 ```clojure
-(es-doc/create-doc c
-                   "test-index"
-                   {:name "Jane Doe 2"
-                    :description "yet another anonymous coward"}
-                   {:refresh "wait_for"})
-```
-```clojure
- {:_index "test-index",
-  :_type "_doc",
-  :_id "EBD9L3ABLWPPOW84CV6I",
-  :_version 1,
-  :result "created",
-  :_shards {:total 2, :successful 1, :failed 0},
-  :_seq_no 0,
-  :_primary_term 1}
-```
-Using the field `id` as document id is the default behavior. However you can provide a mk-id function that takes the created document as parameter to override that behavior and build the id from the document. For instance you could simply provide another field name.
+;; Define policy in ILM format (works for both engines)
+(def rollover-policy
+  {:phases
+   {:hot {:min_age "0ms"
+          :actions {:rollover {:max_docs 10000000
+                               :max_age "7d"}}}
+    :warm {:min_age "7d"
+           :actions {:readonly {}
+                     :force_merge {:max_num_segments 1}}}
+    :delete {:min_age "30d"
+             :actions {:delete {}}}}})
 
-```clojure
-(es-doc/create-doc c
-                   "test-index"
-                   {:uri "http://cisco.com/sighting/1"
-                    :name "Jane Doe 2"
-                    :description "yet another anonymous coward"}
-                   {:refresh "wait_for"
-                   :mk-id :uri})
+;; Create policy - automatically transforms to ISM for OpenSearch
+(require '[ductile.lifecycle :as lifecycle])
+(lifecycle/create-policy! conn "my-rollover-policy" rollover-policy)
+
+;; Get policy (returns ILM format for ES, ISM format for OpenSearch)
+(lifecycle/get-policy conn "my-rollover-policy")
+
+;; Delete policy
+(lifecycle/delete-policy! conn "my-rollover-policy")
 ```
 
-```clojure
- {:_index "test-index",
-  :_type "_doc",
-  :_id "http://cisco.com/sighting/1",
-  :_version 1,
-  :result "created",
-  :_shards {:total 2, :successful 1, :failed 0},
-  :_seq_no 0,
-  :_primary_term 1}
-```
-another example with a function that return the hash of the created document
+**How it works:**
+
+- For **Elasticsearch**: Uses ILM (Index Lifecycle Management) directly
+- For **OpenSearch**: Automatically transforms ILM policy to ISM (Index State Management) format
+- Your code doesn't change - the transformation happens transparently
+
+**Example transformation:**
 
 ```clojure
-(es-doc/create-doc c
-                   "test-index"
-                   {:name "Jane Doe 2"
-                    :description "yet another anonymous coward"}
-                   {:refresh "wait_for"
-                   :mk-id hash})
-```
-```clojure
- {:_index "test-index",
-  :_type "_doc",
-  :_id "1474268975",
-  :_version 1,
-  :result "created",
-  :_shards {:total 2, :successful 1, :failed 0},
-  :_seq_no 0,
-  :_primary_term 1}
-``` 
+;; Input (ILM format)
+{:phases {:hot {:actions {:rollover {:max_docs 100000}}}
+          :delete {:min_age "30d" :actions {:delete {}}}}}
 
-you can similarly create a document with index-doc, but if the document already exists it will erase it
-
-```clojure
-(es-doc/index-doc c
-                  "test-index"
-                  {:id 2
-                   :name "Jane Doe"
-                   :description "another anonymous coward"}
-                  {:refresh "wait_for"})
-
-(es-doc/index-doc c
-                  "test-index"
-                  {:name "John Doe"
-                   :description "not so anonymous coward"}
-                  {:refresh "wait_for"})
-```                  
-the 4th parameter offers to set the `refresh` parameter and can take same string values as corresponding ES query parameter: `true`, 'false', 'wait_for'
-
-* patch a document
-
-```clojure
-(es-doc/update-doc c
-                   "test-index"
-                   1
-                   {:age 36
-                    :description "anonymous but known age"}
-                   {:refresh "wait_for"})
-```
-it returns the patched document
-```clojure
-{:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}
-```
- 
-* retrieve a document
-
-```clojure
-(es-doc/get-doc c
-                "test-index"
-                1
-                {})
-```
-```clojure
-{:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}
-```
-   
-* delete a document 
-
-```clojure
-(es-doc/delete-doc c
-                  "test-index"
-                  1
-                  {:refresh "wait_for"})
- ;; true
- 
- ;;you can also delete documents by query
- (es-doc/delete-by-query conn
-                        ["test_index-1"]
-                        {:query_string {:query "anonymous"}}
-                        {:wait_for_completion true
-                        :refresh "true"})))
- 
+;; Automatically becomes (ISM format for OpenSearch)
+{:states [{:name "hot"
+           :actions [{:rollover {:min_doc_count 100000}}]
+           :transitions [{:state_name "delete"
+                          :conditions {:min_index_age "30d"}}]}
+          {:name "delete"
+           :actions [{:delete {}}]}]
+ :default_state "hot"
+ :schema_version 1}
 ```
 
-* Elasticsearch 5.x compatibility
+### Document Operations
 
-Any of the previous functions can be used on an Elasticsearch 5.x cluster by specifying the document type as a supplementary parameter after the index name. 
-
-```clojure
-(es-doc/get-doc c
-                "test-index"
-                "test-type"
-                1
-                {})
-```
-```clojure
-{:id 1, :name "Jane Doe", :description "anonymous with know age", :age 36}
-```
-
-### and of course you can query it!
-you can either provide classical elasticsearch queries or use some helpers from `ductile.query` namespace
+CRUD operations work identically on both engines:
 
 ```clojure
-(require `[ductile.query :as es-query])
-(es-doc/query c
-              "test-index"
-              (es-query/ids [1 2])
-              {})
+(require '[ductile.document :as doc])
+
+;; Create document
+(doc/create-doc conn "my-index"
+  {:id 1
+   :name "John Doe"
+   :email "john@example.com"}
+  {:refresh "wait_for"})
+
+;; Get document
+(doc/get-doc conn "my-index" 1 {})
+;; => {:id 1 :name "John Doe" :email "john@example.com"}
+
+;; Update document
+(doc/update-doc conn "my-index" 1
+  {:age 30}
+  {:refresh "wait_for"})
+
+;; Delete document
+(doc/delete-doc conn "my-index" 1 {:refresh "wait_for"})
+
+;; Bulk operations
+(doc/bulk-index-docs conn "my-index"
+  [{:id 1 :name "Alice"}
+   {:id 2 :name "Bob"}
+   {:id 3 :name "Charlie"}]
+  {:refresh "true"})
+
+;; Delete by query
+(doc/delete-by-query conn ["my-index"]
+  {:match {:status "archived"}}
+  {:wait_for_completion true :refresh "true"})
 ```
-```clojure
-{:data
- ({:id 2, :name "Jane Doe", :description "another anonymous coward"}),
- :paging {:total-hits 1}}
-```
-if you need all metadata you can use the full-hits? option
+
+### Queries
 
 ```clojure
-(clojure.pprint/pprint
-  (es-doc/query c
-                "test-index"
-                {:match_all {}}
-                {:full-hits? true
-                 :sort {"id" {:order :desc}}
-                 :limit 2}))
+(require '[ductile.query :as q])
+
+;; Simple query
+(doc/query conn "my-index"
+  {:match {:name "John"}}
+  {})
+
+;; Query with aggregations
+(doc/query conn "my-index"
+  {:match_all {}}
+  {:aggs {:age_stats {:stats {:field :age}}}})
+
+;; Using query helpers
+(doc/query conn "my-index"
+  (q/bool {:must [{:match {:status "active"}}]
+           :filter [{:range {:age {:gte 18}}}]})
+  {:limit 100})
+
+;; Search with filters
+(doc/search-docs conn "my-index"
+  {:query_string {:query "active"}}
+  {:age 30}
+  {:sort {:created_at {:order :desc}}})
 ```
-it will return not only the matched documents but also meta data like `_index` and `_score`
+
+### Data Streams
+
+Data streams work on both Elasticsearch 7.9+ and OpenSearch 2.0+:
 
 ```clojure
-{:data
- [{:_index "test-index",
-   :_type "_doc",
-   :_id "2",
-   :_score nil,
-   :_source
-   {:id 2, :name "Jane Doe", :description "another anonymous coward"},
-   :sort [2]}
-  {:_index "test-index",
-   :_type "_doc",
-   :_id "1",
-   :_score nil,
-   :_source
-   {:id 1, :name "Jane Doe", :description "another anonymous coward"},
-   :sort [1]}],
- :paging
- {:total-hits 3,
-  :next {:limit 2, :offset 2, :search_after [1]},
-  :sort [1]}}
+;; Create data stream
+(es-index/create-data-stream! conn "logs-app")
+
+;; Get data stream info
+(es-index/get-data-stream conn "logs-app")
+
+;; Delete data stream
+(es-index/delete-data-stream! conn "logs-app")
 ```
-Ductile also provides a search function with a simple interface that offers to use a Mongo like filters lucene query string to easily match documents.
-`:sort` uses the same format as ElasticSearch's [sort parameter](https://www.elastic.co/guide/en/elasticsearch/reference/current/sort-search-results.html), except via
-EDN.
+
+## Feature Compatibility Matrix
+
+| Feature | Elasticsearch 7 | OpenSearch 2 | OpenSearch 3 | Notes |
+|---------|----------------|--------------|--------------|-------|
+| Basic CRUD | ✅ | ✅ | ✅ | Full compatibility |
+| Queries & Aggregations | ✅ | ✅ | ✅ | Full compatibility |
+| Index Management | ✅ | ✅ | ✅ | Full compatibility |
+| Index Templates | ✅ | ✅ | ✅ | Both legacy and composable |
+| Data Streams | ✅ (7.9+) | ✅ | ✅ | Requires version check |
+| ILM Policies | ✅ | ⚠️ Auto-transform | ⚠️ Auto-transform | Transforms to ISM |
+| ISM Policies | ❌ | ✅ | ✅ | OpenSearch only |
+| Rollover | ✅ | ✅ | ✅ | Full compatibility |
+| Aliases | ✅ | ✅ | ✅ | Full compatibility |
+
+⚠️ = Automatically handled via transformation layer
+
+## Migration from Elasticsearch to OpenSearch
+
+### Zero-Code Migration
+
+If your application only uses basic operations (CRUD, queries, indices), migration is as simple as:
 
 ```clojure
-(es-doc/search-docs c
-                    "test-index"
-                    {:query_string {:query "anonymous"}}
-                    {:age 36}
-                    {:sort {:name {:order :desc}}})
+;; Before (Elasticsearch)
+(def conn (es-conn/connect {:host "es-host" :port 9200 :version 7}))
+
+;; After (OpenSearch) - just add :engine
+(def conn (es-conn/connect {:host "os-host"
+                            :port 9200
+                            :engine :opensearch  ; ← Only change needed
+                            :version 2}))
 ```
 
-### Test stubbing
+### ILM to ISM Migration
 
-To stub ES calls, provide a custom `:request-fn` to `es-conn/connect`.
-It should implement the same interface as the 1-argument version
-of `clj-http.client/request`.
+If you use ILM policies, no code changes are required! Policies are automatically transformed:
+
+```clojure
+;; This code works for BOTH Elasticsearch and OpenSearch
+(require '[ductile.lifecycle :as lifecycle])
+
+(defn setup-lifecycle [conn]
+  (lifecycle/create-policy! conn "my-policy"
+    {:phases {:hot {:actions {:rollover {:max_docs 1000000}}}
+              :delete {:min_age "30d" :actions {:delete {}}}}}))
+
+;; Works with Elasticsearch (creates ILM policy)
+(setup-lifecycle es-conn)
+
+;; Works with OpenSearch (creates ISM policy with auto-transformation)
+(setup-lifecycle os-conn)
+```
+
+### Configuration-Based Migration
+
+Use environment variables or configuration to switch engines:
+
+```clojure
+(defn create-connection [config]
+  (es-conn/connect
+    {:host (:host config)
+     :port (:port config)
+     :engine (keyword (:engine config))  ; "elasticsearch" or "opensearch"
+     :version (:version config)
+     :auth {:type :basic-auth
+            :params {:user (:user config)
+                     :pwd (:password config)}}}))
+
+;; Configuration switches engine
+(def config {:host "localhost"
+             :port 9200
+             :engine "opensearch"  ; ← Switch here
+             :version 2
+             :user "admin"
+             :password "password"})
+
+(def conn (create-connection config))
+```
+
+## Testing
+
+### Running Tests
+
+```bash
+# Run unit tests only
+lein test ductile.capabilities-test ductile.conn-test ductile.features-test ductile.lifecycle-test
+
+# Run with Docker containers
+cd containers
+docker-compose up -d
+
+# Test against all engines
+DUCTILE_TEST_ENGINES=all lein test :integration
+
+# Test against Elasticsearch only
+DUCTILE_TEST_ENGINES=es lein test :integration
+
+# Test against OpenSearch only
+DUCTILE_TEST_ENGINES=os lein test :integration
+```
+
+### Test Stubbing
 
 ```clojure
 (require '[ductile.conn :as es-conn]
          '[clj-http.client :as client])
 
-(def c (es-conn/connect {:host "localhost"
-                         :port 9200
-                         :request-fn (fn [req]
-                                       {:status 200
-                                        :headers {:content-type "application/clojure"}})}))
+;; Stub requests for testing
+(def conn (es-conn/connect
+            {:host "localhost"
+             :port 9200
+             :request-fn (fn [req]
+                          {:status 200
+                           :body {:acknowledged true}})}))
 ```
 
-See the middleware provided by `clj-http.client/wrap-*` for simulating more interesting cases.
-For example, this intercepts query-params and prints them:
+## Advanced Usage
+
+### Custom Request Function
 
 ```clojure
-(require '[ductile.conn :as es-conn]
-         '[ring.util.codec :refer [form-decode]]
-         '[clojure.walk :refer [keywordize-keys]]
-         '[clj-http.client :as client])
-
-(def c (es-conn/connect {:host "localhost"
-                         :port 9200
-                         :request-fn
-                         (-> (fn [req]
-                               (prn {:query-params (keywordize-keys (form-decode (:query-string req)))})
-                               {:status 200
-                                :headers {:content-type "application/clojure"}})
-                             client/wrap-query-params)}))
+(def conn (es-conn/connect
+            {:host "localhost"
+             :port 9200
+             :request-fn (-> (fn [req]
+                              (println "Request:" req)
+                              (client/request req))
+                            client/wrap-query-params)}))
 ```
 
+### Connection Pooling
 
+Ductile automatically manages connection pooling with sensible defaults:
+
+- 100 threads
+- 100 connections per route
+- Configurable timeout
+
+### Error Handling
+
+```clojure
+(try
+  (doc/create-doc conn "my-index" {:id 1 :name "test"} {})
+  (catch clojure.lang.ExceptionInfo e
+    (let [data (ex-data e)]
+      (case (:type data)
+        :ductile.conn/unauthorized (println "Auth failed")
+        :ductile.conn/invalid-request (println "Invalid request")
+        :ductile.conn/es-unknown-error (println "Unknown error")
+        (throw e)))))
+```
+
+## Docker Support
+
+Test containers are provided for local development:
+
+```bash
+cd containers
+docker-compose up -d
+
+# Services:
+# - es7: Elasticsearch 7.10.1 on port 9207
+# - opensearch2: OpenSearch 2.19.0 on port 9202
+# - opensearch3: OpenSearch 3.1.0 on port 9203
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Run tests: `lein test`
+4. Submit a pull request
 
 ## License
 
@@ -418,3 +521,7 @@ Copyright © Cisco Systems
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at
 http://www.eclipse.org/legal/epl-2.0.
+
+## Support
+
+For issues and feature requests, please use the GitHub issue tracker.

@@ -16,12 +16,17 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     strategy:
       matrix:
-        docker-compose:
-          - 'containers/docker-compose.yml'
-          - 'containers/es7/docker-compose.yml'
+        include:
+          - docker-compose: 'containers/docker-compose.yml'
+            test-engines: 'all'
+            name: 'ES7 + OpenSearch 2 + OpenSearch 3'
+          - docker-compose: 'containers/es7/docker-compose.yml'
+            test-engines: 'es'
+            name: 'Elasticsearch 7 only'
+    name: Test (${{ matrix.name }})
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,7 +42,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 21
-      # ES5 needs this
+      # ES needs this
       - run: sudo sysctl -w vm.max_map_count=262144
       # create log & bin dir if missing
       - run: mkdir -p $LOG_DIR
@@ -46,10 +51,40 @@ jobs:
       - run: docker compose -f ${{ matrix.docker-compose }} logs -f > $COMPOSE_LOG &
       - run: docker compose -f ${{ matrix.docker-compose }} ps
 
-      # Wait ES
-      - run: until curl http://127.0.0.1:9207/; do sleep 1; done
+      # Wait for ES to be ready
+      - name: Wait for Elasticsearch
+        run: |
+          until curl -u elastic:ductile http://127.0.0.1:9207/_cluster/health; do
+            echo "Waiting for Elasticsearch..."
+            sleep 2
+          done
+        timeout-minutes: 2
+
+      # Wait for OpenSearch if testing all engines
+      - name: Wait for OpenSearch 2
+        if: matrix.test-engines == 'all'
+        run: |
+          until curl http://127.0.0.1:9202/_cluster/health; do
+            echo "Waiting for OpenSearch 2..."
+            sleep 2
+          done
+        timeout-minutes: 2
+
+      - name: Wait for OpenSearch 3
+        if: matrix.test-engines == 'all'
+        run: |
+          until curl http://127.0.0.1:9203/_cluster/health; do
+            echo "Waiting for OpenSearch 3..."
+            sleep 2
+          done
+        timeout-minutes: 2
+
       - name: Install clojure tools
         uses: DeLaGuardo/setup-clojure@12.5
         with:
           lein: latest
-      - run: lein do clean, javac, test :all, with-profile test-encoding test
+
+      - name: Run tests
+        env:
+          DUCTILE_TEST_ENGINES: ${{ matrix.test-engines }}
+        run: lein do clean, javac, test :all, with-profile test-encoding test

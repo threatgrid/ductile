@@ -1,5 +1,5 @@
-(defproject threatgrid/ductile "0.5.1-SNAPSHOT"
-  :description "Yet another Clojure client for Elasticsearch REST API, that fits our needs"
+(defproject threatgrid/ductile "0.6.0-SNAPSHOT"
+  :description "Clojure client for Elasticsearch and OpenSearch REST APIs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}

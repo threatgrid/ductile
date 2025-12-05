@@ -5,7 +5,8 @@
    [clojure.string :as string]
    [clojure.walk :as walk]
    [ductile.conn :refer [make-http-opts safe-es-read]]
-   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings Policy AliasAction]]
+   [ductile.features :as feat]
+   [ductile.schemas :refer [CatIndices ESConn RolloverConditions ESSettings AliasAction]]
    [ductile.uri :as uri]
    [schema-tools.core :as st]
    [schema.core :as s]))
@@ -51,12 +52,6 @@
    index-name :- (s/maybe s/Str)]
   (uri/uri uri (uri/uri-encode index-name) "_refresh"))
 
-(s/defn policy-uri
-  "make a policy uri from a host, and a policy name"
-  [uri :- s/Str
-   policy-name :- s/Str]
-  (uri/uri uri "_ilm/policy" (uri/uri-encode policy-name)))
-
 (s/defn data-stream-uri
   "make a datastral uri from a host, and a data stream name"
   [uri :- s/Str
@@ -64,10 +59,10 @@
   (uri/uri uri "_data_stream" (uri/uri-encode data-stream-name)))
 
 (s/defn create-data-stream!
-  [{:keys [uri version request-fn] :as conn} :- ESConn
+  [{:keys [uri request-fn] :as conn} :- ESConn
    data-stream-name :- s/Str]
-  (when (< version 7)
-    (throw (ex-info "Cannot create datastream for Elasticsearch version < 7" conn)))
+  (when-not (feat/supports-data-streams? conn)
+    (throw (ex-info "Data streams not supported on this engine/version" conn)))
   (-> (make-http-opts conn)
       (assoc :method :put
              :url (data-stream-uri uri data-stream-name))
@@ -75,10 +70,10 @@
       safe-es-read))
 
 (s/defn delete-data-stream!
-  [{:keys [uri version request-fn] :as conn} :- ESConn
+  [{:keys [uri request-fn] :as conn} :- ESConn
    data-stream-name :- s/Str]
-  (when (< version 7)
-    (throw (ex-info "Cannot delete data stream for Elasticsearch version < 7" conn)))
+  (when-not (feat/supports-data-streams? conn)
+    (throw (ex-info "Data streams not supported on this engine/version" conn)))
   (-> (make-http-opts conn)
       (assoc :method :delete
              :url (data-stream-uri uri data-stream-name))
@@ -86,51 +81,13 @@
       safe-es-read))
 
 (s/defn get-data-stream
-  [{:keys [uri version request-fn] :as conn} :- ESConn
+  [{:keys [uri request-fn] :as conn} :- ESConn
    data-stream-name :- s/Str]
-  (when (< version 7)
-    (throw (ex-info "Cannot get data stream for Elasticsearch version < 7" conn)))
+  (when-not (feat/supports-data-streams? conn)
+    (throw (ex-info "Data streams not supported on this engine/version" conn)))
   (-> (make-http-opts conn)
       (assoc :method :get
              :url (data-stream-uri uri data-stream-name))
-      request-fn
-      safe-es-read))
-
-(s/defn create-policy!
-  [{:keys [uri version request-fn] :as conn} :- ESConn
-   policy-name :- s/Str
-   policy :- Policy]
-  (when (< version 7)
-    (throw (ex-info "Cannot create policiy for Elasticsearch version < 7" conn)))
-  (-> (make-http-opts conn
-                      {}
-                      []
-                      {:policy policy}
-                      nil)
-      (assoc :method :put
-             :url (policy-uri uri policy-name))
-      request-fn
-      safe-es-read))
-
-(s/defn delete-policy!
-  [{:keys [uri version request-fn] :as conn} :- ESConn
-   policy-name :- s/Str]
-  (when (< version 7)
-    (throw (ex-info "Cannot delete policiy for Elasticsearch version < 7" conn)))
-  (-> (make-http-opts conn)
-      (assoc :method :delete
-             :url (policy-uri uri policy-name))
-      request-fn
-      safe-es-read))
-
-(s/defn get-policy
-  [{:keys [uri version request-fn] :as conn} :- ESConn
-   policy-name :- s/Str]
-  (when (< version 7)
-    (throw (ex-info "Cannot get policiy for Elasticsearch version < 7" conn)))
-  (-> (make-http-opts conn)
-      (assoc :method :get
-             :url (policy-uri uri policy-name))
       request-fn
       safe-es-read))
 
@@ -295,10 +252,10 @@
 
 (s/defn get-index-template
   "get an index template"
-  [{:keys [uri request-fn version] :as conn} :- ESConn
+  [{:keys [uri request-fn] :as conn} :- ESConn
    index-name :- s/Str]
-  (when (< version 7)
-    (throw (ex-info "Cannot get index-template for Elasticsearch version < 7" conn)))
+  (when-not (feat/supports-composable-templates? conn)
+    (throw (ex-info "Composable index templates not supported on this engine/version" conn)))
   (-> (make-http-opts conn {})
       (assoc :method :get
              :url (index-template-uri uri index-name))
@@ -307,11 +264,11 @@
 
 (s/defn create-index-template!
   "create an index template, update if already exists"
-  [{:keys [uri request-fn version] :as conn} :- ESConn
+  [{:keys [uri request-fn] :as conn} :- ESConn
    template-name :- s/Str
    template]
-  (when (< version 7)
-    (throw (ex-info "Cannot create index-template for Elasticsearch version < 7" conn)))
+  (when-not (feat/supports-composable-templates? conn)
+    (throw (ex-info "Composable index templates not supported on this engine/version" conn)))
   (-> (make-http-opts conn {} nil template nil)
       (assoc :method :put
              :url (index-template-uri uri template-name))
@@ -320,10 +277,10 @@
 
 (s/defn delete-index-template!
   "delete a template"
-  [{:keys [uri request-fn version] :as conn} :- ESConn
+  [{:keys [uri request-fn] :as conn} :- ESConn
    index-name :- s/Str]
-  (when (< version 7)
-    (throw (ex-info "Cannot delete index-template for Elasticsearch version < 7" conn)))
+  (when-not (feat/supports-composable-templates? conn)
+    (throw (ex-info "Composable index templates not supported on this engine/version" conn)))
   (-> (make-http-opts conn {})
       (assoc :method :delete
              :url (index-template-uri uri index-name))

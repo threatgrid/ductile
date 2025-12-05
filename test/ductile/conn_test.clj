@@ -96,3 +96,41 @@
                  :params {:token "any-token"}}
                 {:oauth-token "any-token"}]]]
                (test-auth auth-params expected)))))
+
+(deftest engine-test
+  (testing "engine parameter defaults to :elasticsearch for backward compatibility"
+    (let [conn (sut/connect {:host "127.0.0.1"
+                             :port 9200})]
+      (is (= :elasticsearch (:engine conn))
+          "Default engine should be :elasticsearch")))
+
+  (testing "engine parameter can be explicitly set to :elasticsearch"
+    (let [conn (sut/connect {:host "127.0.0.1"
+                             :port 9200
+                             :engine :elasticsearch})]
+      (is (= :elasticsearch (:engine conn))
+          "Explicitly set :elasticsearch engine")))
+
+  (testing "engine parameter can be set to :opensearch"
+    (let [conn (sut/connect {:host "127.0.0.1"
+                             :port 9200
+                             :engine :opensearch})]
+      (is (= :opensearch (:engine conn))
+          "OpenSearch engine should be set correctly")))
+
+  (testing "version defaults to 7 for elasticsearch"
+    (let [conn (sut/connect {:host "127.0.0.1"
+                             :port 9200
+                             :engine :elasticsearch})]
+      (is (= 7 (:version conn))
+          "Default version should be 7")))
+
+  (testing "version can be set for opensearch"
+    (let [conn (sut/connect {:host "127.0.0.1"
+                             :port 9200
+                             :engine :opensearch
+                             :version 2})]
+      (is (= 2 (:version conn))
+          "OpenSearch version 2 should be set correctly")
+      (is (= :opensearch (:engine conn))
+          "Engine should be :opensearch"))))
