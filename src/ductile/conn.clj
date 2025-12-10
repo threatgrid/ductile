@@ -6,12 +6,11 @@
             [ductile.schemas :refer [ConnectParams ESConn]]
             [schema.core :as s]))
 
-(def default-timeout 30000)
-
-(defn cm-options [{:keys [timeout]}]
-  {:timeout timeout
-   :threads 100
-   :default-per-route 100})
+(def default-connection-ttl 60)
+(def default-validate-after-inactivity 5000)
+(def default-threads 100)
+(def default-per-route 100)
+(def default-connection-timeout 10000)
 
 (def default-opts
   {:as :json
@@ -19,7 +18,7 @@
    :throw-exceptions false})
 
 (s/defn make-http-opts :- (s/pred map?)
-  ([{:keys [cm auth]} :- (s/maybe ESConn)
+  ([{:keys [cm auth timeouts]} :- (s/maybe ESConn)
     opts :- (s/pred map?)
     query-params-keys :- (s/maybe (s/pred coll?))
     form-params :- (s/maybe (s/pred map?))
@@ -29,35 +28,81 @@
      body (assoc :body body)
      form-params (assoc :form-params form-params)
      cm (assoc :connection-manager cm)
+     (:connection-timeout timeouts) (assoc :connection-timeout (:connection-timeout timeouts))
+     (:socket-timeout timeouts) (assoc :socket-timeout (:socket-timeout timeouts))
      (seq query-params-keys) (assoc :query-params
                                     (select-keys opts query-params-keys))))
   ([conn opts query-params-keys] (make-http-opts conn opts query-params-keys nil nil))
   ([conn opts] (make-http-opts conn opts [] nil nil))
   ([conn] (make-http-opts conn {} [] nil nil)))
 
-(defn make-connection-manager [cm-options]
-  (make-reusable-conn-manager cm-options))
+(defn make-connection-manager
+  "Create a reusable connection manager with the given options.
+
+   Options:
+   - :connection-ttl - how long connections live in the pool in seconds
+   - :threads - max total connections
+   - :default-per-route - max connections per route
+   - :insecure? - allow insecure SSL (self-signed certs)
+   - :validate-after-inactivity - check idle connections before reuse (in ms)
+     Helps prevent NoHttpResponseException from stale connections."
+  [{:keys [connection-ttl validate-after-inactivity] :as opts}]
+  (let [;; clj-http uses :timeout for TTL
+        cm-opts (-> opts
+                    (dissoc :connection-ttl :validate-after-inactivity)
+                    (assoc :timeout connection-ttl))
+        conn-mgr (make-reusable-conn-manager cm-opts)]
+    (when (some? validate-after-inactivity)
+      (.setValidateAfterInactivity conn-mgr (int validate-after-inactivity)))
+    conn-mgr))
 
 (s/defn connect :- ESConn
   "Instantiate an ES conn from ConnectParams props.
 
   To intercept all ES HTTP requests, set :request-fn
   to function with the same interface as the 1-argument
-  arity of `clj-http.client/request`."
-  [{:keys [protocol host port timeout version engine auth request-fn]
+  arity of `clj-http.client/request`.
+
+  Connection pool options:
+  - :connection-ttl - how long connections live in the pool in seconds (default: 60)
+  - :validate-after-inactivity - check idle connections before reuse, in ms (default: 5000)
+    Prevents NoHttpResponseException from stale connections closed server-side.
+  - :threads - max total connections in pool (default: 100)
+  - :default-per-route - max connections per route (default: 100)
+  - :insecure? - allow insecure SSL connections, e.g. self-signed certs (default: false)
+
+  Request timeout options (applied to every request):
+  - :connection-timeout - time to establish TCP connection in ms (default: 10000)
+  - :socket-timeout - time to wait for data in ms (default: none, for long-running operations)"
+  [{:keys [protocol host port connection-ttl version engine auth request-fn
+           validate-after-inactivity threads default-per-route insecure?
+           connection-timeout socket-timeout]
     :or {protocol :http
          request-fn client/request
-         timeout default-timeout
+         connection-ttl default-connection-ttl
+         validate-after-inactivity default-validate-after-inactivity
+         threads default-threads
+         default-per-route default-per-route
+         insecure? false
+         connection-timeout default-connection-timeout
          version 7
          engine :elasticsearch}} :- ConnectParams]
-  (let [conn {:cm (make-connection-manager
-                   (cm-options {:timeout timeout}))
+  (let [timeouts (cond-> {}
+                   connection-timeout (assoc :connection-timeout connection-timeout)
+                   socket-timeout (assoc :socket-timeout socket-timeout))
+        conn {:cm (make-connection-manager
+                   {:connection-ttl connection-ttl
+                    :validate-after-inactivity validate-after-inactivity
+                    :threads threads
+                    :default-per-route default-per-route
+                    :insecure? insecure?})
               :request-fn request-fn
               :uri (format "%s://%s:%s" (name protocol) host port)
               :version version
               :engine engine}]
     (cond-> conn
-      auth (assoc :auth (auth/http-options auth)))))
+      auth (assoc :auth (auth/http-options auth))
+      (seq timeouts) (assoc :timeouts timeouts))))
 
 (s/defn close [conn :- ESConn]
   (-> conn :cm shutdown-manager))

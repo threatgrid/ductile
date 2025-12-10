@@ -2,8 +2,7 @@
   "All ES related schemas should be defined here"
   (:require [schema.core :as s]
             [schema-tools.core :as st])
-  (:import [org.apache.http.impl.conn PoolingClientConnectionManager
-            PoolingHttpClientConnectionManager]))
+  (:import [org.apache.http.impl.conn PoolingHttpClientConnectionManager]))
 
 (s/defschema RequestFn
   "A function implementing the 1-argument
@@ -33,20 +32,29 @@
     (s/optional-key :authorization) s/Str
     (s/optional-key :version) s/Int
     (s/optional-key :engine) (s/enum :elasticsearch :opensearch)
-    (s/optional-key :timeout) s/Int
+    ;; Connection pool options
+    (s/optional-key :connection-ttl) s/Int
+    (s/optional-key :validate-after-inactivity) s/Int
+    (s/optional-key :threads) s/Int
+    (s/optional-key :default-per-route) s/Int
+    (s/optional-key :insecure?) s/Bool
+    ;; Request timeout options
+    (s/optional-key :connection-timeout) s/Int
+    (s/optional-key :socket-timeout) s/Int
     (s/optional-key :auth) AuthParams
     (s/optional-key :request-fn) RequestFn}))
 
 (s/defschema ESConn
   "an ES conn is a map with a
    connection manager and an index name"
-  {:cm (s/either PoolingClientConnectionManager
-                 PoolingHttpClientConnectionManager)
+  {:cm PoolingHttpClientConnectionManager
    :uri s/Str
    :version s/Int
    :engine (s/enum :elasticsearch :opensearch)
    :request-fn RequestFn
-   (s/optional-key :auth) (s/pred map?)})
+   (s/optional-key :auth) (s/pred map?)
+   (s/optional-key :timeouts) {(s/optional-key :connection-timeout) s/Int
+                               (s/optional-key :socket-timeout) s/Int}})
 
 (s/defschema Refresh
   "ES refresh parameter, see
