@@ -1,4 +1,4 @@
-(defproject threatgrid/ductile "0.6.1-SNAPSHOT"
+(defproject threatgrid/ductile "0.6.1"
   :description "Clojure client for Elasticsearch and OpenSearch REST APIs"
   :url "https://github.com/threatgrid/ductile"
   :license {:name "Eclipse Public License"
