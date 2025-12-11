@@ -97,6 +97,70 @@
       ;; Verify deletion
       (is (= nil (lifecycle/get-policy conn policy-name))))))
 
+(deftest ^:integration policy-update-test
+  (let [policy-name "test-update-policy"
+        policy-v1 {:phases
+                   {:hot
+                    {:min_age "0ms"
+                     :actions
+                     {:rollover {:max_docs 100000}}}}}
+        policy-v2 {:phases
+                   {:hot
+                    {:min_age "0ms"
+                     :actions
+                     {:rollover {:max_docs 200000}}}}}]
+    (for-each-es-version
+     "Policy update operations"
+     ;; Clean up any existing policy
+     (try (lifecycle/delete-policy! conn policy-name) (catch Exception _))
+
+      ;; Create initial policy
+      (is (= {:acknowledged true}
+             (lifecycle/create-policy! conn policy-name policy-v1)))
+
+      ;; Test update-policy!
+      (is (= {:acknowledged true}
+             (lifecycle/update-policy! conn policy-name policy-v2)))
+
+      ;; Verify update (OpenSearch transforms to ISM, so check differently)
+      (let [retrieved (lifecycle/get-policy conn policy-name)]
+        (case engine
+          :elasticsearch
+          (is (= 200000
+                 (get-in retrieved [(keyword policy-name) :policy :phases :hot :actions :rollover :max_docs])))
+
+          :opensearch
+          ;; For OpenSearch, verify the ISM format has the updated value
+          (let [ism-policy (get-in retrieved [(keyword policy-name) :policy])
+                hot-state (first (:states ism-policy))
+                rollover-action (first (filter :rollover (:actions hot-state)))]
+            (is (= 200000 (get-in rollover-action [:rollover :min_doc_count]))))))
+
+      ;; Test create-policy! with existing policy (should auto-update)
+      (let [policy-v3 {:phases
+                       {:hot
+                        {:min_age "0ms"
+                         :actions
+                         {:rollover {:max_docs 300000}}}}}]
+        (is (= {:acknowledged true}
+               (lifecycle/create-policy! conn policy-name policy-v3)))
+
+        ;; Verify the auto-update worked
+        (let [retrieved (lifecycle/get-policy conn policy-name)]
+          (case engine
+            :elasticsearch
+            (is (= 300000
+                   (get-in retrieved [(keyword policy-name) :policy :phases :hot :actions :rollover :max_docs])))
+
+            :opensearch
+            (let [ism-policy (get-in retrieved [(keyword policy-name) :policy])
+                  hot-state (first (:states ism-policy))
+                  rollover-action (first (filter :rollover (:actions hot-state)))]
+              (is (= 300000 (get-in rollover-action [:rollover :min_doc_count])))))))
+
+      ;; Clean up
+      (lifecycle/delete-policy! conn policy-name))))
+
 (deftest ^:integration index-crud-ops
   (let [indexname "test_index"
         indexkw (keyword indexname)]
