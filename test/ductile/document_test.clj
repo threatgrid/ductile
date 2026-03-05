@@ -819,6 +819,29 @@
              (pagination-params es7-result
                                 es-params))))))
 
+(deftest bulk-request-options-avoid-unsafe-http-retries
+  (let [called-request (atom nil)
+        fake-request-fn (fn [req]
+                          (reset! called-request req)
+                          {:status 200 :body {:took 1 :errors false :items []}})
+        conn (es-conn/connect {:host "localhost"
+                               :port 9200
+                               :request-fn fake-request-fn})]
+    (try
+      (let [docs [{:_id "doc-1" :_index "test-index" :foo "bar"}]
+            _ (sut/bulk-index-docs conn docs {})
+            req @called-request]
+        (testing "bulk body is repeatable and newline-terminated NDJSON"
+          (is (string? (:body req)))
+          (is (.endsWith ^String (:body req) "\n")))
+        (testing "bulk request disables transport-level retry/redirect"
+          (is (= :none (:redirect-strategy req)))
+          (is (false? ((:retry-handler req) (Exception.) 1 nil))))
+        (testing "bulk request content type is explicit"
+          (is (= "application/x-ndjson" (:content-type req)))))
+      (finally
+        (es-conn/close conn)))))
+
 (deftest ^:encoding byte-size-test
   (testing "calculation of string byte size respect UTF-8 encoding"
     (is (= (count (.getBytes "qй" "UTF-8"))

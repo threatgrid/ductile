@@ -139,17 +139,20 @@
   [json-ops
    {:keys [uri request-fn] :as conn}
    opts]
-  (let [bulk-body (-> json-ops
-                      (interleave (repeat "\n"))
-                      string/join
-                      string->input-stream)]
+  (let [bulk-body (str (string/join "\n" json-ops) "\n")]
     (-> (conn/make-http-opts conn
                              opts
                              [:refresh]
                              nil
                              bulk-body)
+        ;; For bulk indexing, avoid transport-level replay/redirect surprises.
+        ;; Retries should be handled at the application level with explicit
+        ;; idempotency/error semantics.
         (assoc :method :post
-               :url (bulk-uri uri))
+               :url (bulk-uri uri)
+               :content-type "application/x-ndjson"
+               :redirect-strategy :none
+               :retry-handler (fn [_e _cnt _context] false))
         request-fn
         conn/safe-es-read
         conn/safe-es-bulk-read)))
