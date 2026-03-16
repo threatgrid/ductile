@@ -13,17 +13,17 @@
 
 (deftest index-uri-test
   (testing "should generate a valid index URI"
-    (is (= (sut/index-uri "http://127.0.0.1" "test")
-           "http://127.0.0.1/test"))
-    (is (= (sut/index-uri "http://127.0.0.1" "<logstash-{now/d}>")
-           "http://127.0.0.1/%3Clogstash-%7Bnow%2Fd%7D%3E"))))
+    (is (= "http://127.0.0.1/test"
+           (sut/index-uri "http://127.0.0.1" "test")))
+    (is (= "http://127.0.0.1/%3Clogstash-%7Bnow%2Fd%7D%3E"
+           (sut/index-uri "http://127.0.0.1" "<logstash-{now/d}>")))))
 
 (deftest template-uri-test
   (testing "should generate a valid template URI"
-    (is (= (sut/template-uri "http://127.0.0.1" "test")
-           "http://127.0.0.1/_template/test"))
-    (is (= (sut/template-uri "http://127.0.0.1" "testé")
-           "http://127.0.0.1/_template/test%C3%A9"))))
+    (is (= "http://127.0.0.1/_template/test"
+           (sut/template-uri "http://127.0.0.1" "test")))
+    (is (= "http://127.0.0.1/_template/test%C3%A9"
+           (sut/template-uri "http://127.0.0.1" "testé")))))
 
 (deftest index-template-uri-test
   (testing "should generate a valid index template URI"
@@ -34,14 +34,14 @@
 
 (deftest rollover-uri-test
   (testing "should generate a valid rollover URI"
-    (is (= (sut/rollover-uri "http://127.0.0.1" "test")
-           "http://127.0.0.1/test/_rollover"))
-    (is (= (sut/rollover-uri "http://127.0.0.1" "test" nil true)
-           "http://127.0.0.1/test/_rollover?dry_run"))
-    (is (= (sut/rollover-uri "http://127.0.0.1" "test" "test2" true)
-           "http://127.0.0.1/test/_rollover/test2?dry_run"))
-    (is (= (sut/rollover-uri "http://127.0.0.1" "test" "test2" false)
-           "http://127.0.0.1/test/_rollover/test2"))))
+    (is (= "http://127.0.0.1/test/_rollover"
+           (sut/rollover-uri "http://127.0.0.1" "test")))
+    (is (= "http://127.0.0.1/test/_rollover?dry_run"
+           (sut/rollover-uri "http://127.0.0.1" "test" nil true)))
+    (is (= "http://127.0.0.1/test/_rollover/test2?dry_run"
+           (sut/rollover-uri "http://127.0.0.1" "test" "test2" true)))
+    (is (= "http://127.0.0.1/test/_rollover/test2"
+           (sut/rollover-uri "http://127.0.0.1" "test" "test2" false)))))
 
 (deftest refresh-uri-test
   (testing "should generat a proper refresh URI"
